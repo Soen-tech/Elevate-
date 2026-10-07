@@ -54,9 +54,15 @@ export default function App() {
     name: string;
     company: string;
     phone: string;
+    isAdmin?: boolean;
   } | null>(() => {
     const saved = localStorage.getItem('elevate_current_user');
     return saved ? JSON.parse(saved) : null;
+  });
+
+  const [experiencesList, setExperiencesList] = useState<Experience[]>(() => {
+    const saved = localStorage.getItem('elevate_experiences_list');
+    return saved ? JSON.parse(saved) : EXPERIENCES;
   });
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -102,8 +108,30 @@ export default function App() {
     cvv: '',
   });
 
+  // Admin Dashboard States
+  const [adminSubTab, setAdminSubTab] = useState<'events' | 'purchases'>('events');
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [adminEventForm, setAdminEventForm] = useState({
+    title: '',
+    category: 'Tennis' as any,
+    location: '',
+    venue: '',
+    dates: '',
+    tagline: '',
+    shortDescription: '',
+    description: '',
+    highlightBenefit: '',
+    image: '',
+    package1Name: 'The Pavilion Club',
+    package1Price: 750,
+    package1Benefits: 'Premium padded seating, Gourmet buffet, Fine wines & champagne',
+    package2Name: 'The President’s Suite',
+    package2Price: 2200,
+    package2Benefits: 'Front-row Box Seating, Five-course private menu, Dedicated butler, Chauffeur transfers',
+  });
+
   // Core navigation state
-  const [currentTab, setCurrentTab] = useState<'home' | 'vip' | 'wishlist' | 'basket' | 'requests'>('home');
+  const [currentTab, setCurrentTab] = useState<'home' | 'vip' | 'wishlist' | 'basket' | 'requests' | 'admin'>('home');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Search & Filter state
@@ -246,20 +274,44 @@ export default function App() {
 
   // Seed default registered users for instant testing
   useEffect(() => {
-    const users = localStorage.getItem('elevate_users');
-    if (!users) {
-      const defaultUsers = [
-        {
-          email: 'soentechnologies@gmail.com',
-          name: 'Soen Technologies',
-          company: 'Soen Tech Ltd',
-          phone: '+44 20 7946 0192',
-          password: '1234',
-        }
-      ];
-      localStorage.setItem('elevate_users', JSON.stringify(defaultUsers));
+    const usersStr = localStorage.getItem('elevate_users');
+    let users = usersStr ? JSON.parse(usersStr) : [];
+    
+    const adminEmail = 'soentechnologies@gmail.com';
+    const adminIndex = users.findIndex((u: any) => u.email.toLowerCase() === adminEmail.toLowerCase());
+    
+    if (adminIndex === -1) {
+      users.push({
+        email: adminEmail,
+        name: 'Soen Technologies',
+        company: 'Soen Tech Ltd',
+        phone: '+44 20 7946 0192',
+        password: '1234',
+        isAdmin: true,
+      });
+      localStorage.setItem('elevate_users', JSON.stringify(users));
+    } else {
+      let modified = false;
+      if (!users[adminIndex].isAdmin) {
+        users[adminIndex].isAdmin = true;
+        modified = true;
+      }
+      if (users[adminIndex].password !== '1234') {
+        users[adminIndex].password = '1234';
+        modified = true;
+      }
+      if (modified) {
+        localStorage.setItem('elevate_users', JSON.stringify(users));
+      }
     }
   }, []);
+
+  // Auto-promote soentechnologies@gmail.com if signed in without admin flag
+  useEffect(() => {
+    if (currentUser && currentUser.email.toLowerCase() === 'soentechnologies@gmail.com' && !currentUser.isAdmin) {
+      setCurrentUser(prev => prev ? { ...prev, isAdmin: true } : null);
+    }
+  }, [currentUser]);
 
   // Calculations for customizer
   const getUpgradeCost = (key: keyof typeof upgrades) => {
@@ -339,6 +391,7 @@ export default function App() {
         name: user.name,
         company: user.company || '',
         phone: user.phone || '',
+        isAdmin: !!user.isAdmin || user.email.toLowerCase() === 'soentechnologies@gmail.com',
       };
       setCurrentUser(loggedInUser);
       setAuthModalOpen(false);
@@ -446,6 +499,109 @@ export default function App() {
     setCurrentTab('requests');
   };
 
+  // Save/Create Event Handler
+  const handleSaveEvent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminEventForm.title || !adminEventForm.location || !adminEventForm.venue || !adminEventForm.dates) {
+      alert('Please fill in all required event details.');
+      return;
+    }
+
+    // Map packages
+    const pkg1: PackageTier = {
+      name: adminEventForm.package1Name || 'The Pavilion Club',
+      price: Number(adminEventForm.package1Price) || 500,
+      benefits: adminEventForm.package1Benefits.split(',').map(b => b.trim()).filter(Boolean),
+      description: 'Standard luxury hospitality with prime seat allotments and catered food/bars.',
+    };
+    
+    const pkg2: PackageTier = {
+      name: adminEventForm.package2Name || 'The President’s Suite',
+      price: Number(adminEventForm.package2Price) || 1500,
+      benefits: adminEventForm.package2Benefits.split(',').map(b => b.trim()).filter(Boolean),
+      description: 'Ultra-exclusive private suite access with bespoke dining, personal butler, and custom transfers.',
+    };
+
+    const parsedExperience: Experience = {
+      id: editingEventId || `event-${Date.now()}-${adminEventForm.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+      title: adminEventForm.title,
+      category: adminEventForm.category,
+      location: adminEventForm.location,
+      venue: adminEventForm.venue,
+      dates: adminEventForm.dates,
+      image: adminEventForm.image || '/assets/images/elevate_hero_1791372544717.jpg',
+      tagline: adminEventForm.tagline || 'L’Art de Vivre d’Élite',
+      shortDescription: adminEventForm.shortDescription || 'Experience unmatched VIP hospitality access under sovereign guidelines.',
+      description: adminEventForm.description || 'Step into the supreme luxury arena where high adrenaline sport meets three-star gastronomy. Secure official debentures and Loge box seating allotments.',
+      highlightBenefit: adminEventForm.highlightBenefit || 'Premium category seating combined with Michelin-Starred menus.',
+      packages: [pkg1, pkg2],
+    };
+
+    setExperiencesList(prev => {
+      if (editingEventId) {
+        return prev.map(exp => exp.id === editingEventId ? parsedExperience : exp);
+      } else {
+        return [...prev, parsedExperience];
+      }
+    });
+
+    alert(editingEventId ? 'Event updated successfully!' : 'New luxury event added to the catalog!');
+    handleResetEventForm();
+  };
+
+  // Delete Event Handler
+  const handleDeleteEvent = (id: string) => {
+    if (confirm('Are you absolutely certain you want to remove this elite event from the catalog? This action is irreversible.')) {
+      setExperiencesList(prev => prev.filter(exp => exp.id !== id));
+    }
+  };
+
+  // Load Event for Editing
+  const handleEditEventStart = (exp: Experience) => {
+    setEditingEventId(exp.id);
+    setAdminEventForm({
+      title: exp.title,
+      category: exp.category,
+      location: exp.location,
+      venue: exp.venue,
+      dates: exp.dates,
+      tagline: exp.tagline,
+      shortDescription: exp.shortDescription,
+      description: exp.description,
+      highlightBenefit: exp.highlightBenefit,
+      image: exp.image,
+      package1Name: exp.packages[0]?.name || 'The Pavilion Club',
+      package1Price: exp.packages[0]?.price || 750,
+      package1Benefits: exp.packages[0]?.benefits.join(', ') || '',
+      package2Name: exp.packages[1]?.name || 'The President’s Suite',
+      package2Price: exp.packages[1]?.price || 2200,
+      package2Benefits: exp.packages[1]?.benefits.join(', ') || '',
+    });
+  };
+
+  // Reset Event Form
+  const handleResetEventForm = () => {
+    setEditingEventId(null);
+    setAdminEventForm({
+      title: '',
+      category: 'Tennis' as any,
+      location: '',
+      venue: '',
+      dates: '',
+      tagline: '',
+      shortDescription: '',
+      description: '',
+      highlightBenefit: '',
+      image: '',
+      package1Name: 'The Pavilion Club',
+      package1Price: 750,
+      package1Benefits: 'Premium padded seating, Gourmet buffet, Fine wines & champagne',
+      package2Name: 'The President’s Suite',
+      package2Price: 2200,
+      package2Benefits: 'Front-row Box Seating, Five-course private menu, Dedicated butler, Chauffeur transfers',
+    });
+  };
+
   // Submit direct basket inquiry
   const handleSubmitBasketInquiry = (e: React.FormEvent) => {
     e.preventDefault();
@@ -490,12 +646,12 @@ export default function App() {
     e.preventDefault();
     
     // Find matching experience based on category and budget limits
-    const filtered = EXPERIENCES.filter(exp => {
+    const filtered = experiencesList.filter(exp => {
       if (vipCategory !== 'All' && exp.category !== vipCategory) return false;
       return true;
     });
 
-    const recommendedExperience = filtered.length > 0 ? filtered[0] : EXPERIENCES[0];
+    const recommendedExperience = filtered.length > 0 ? filtered[0] : experiencesList[0];
     const recommendedTier = recommendedExperience.packages[1] || recommendedExperience.packages[0];
 
     // Calc custom total based on sliders
@@ -534,7 +690,7 @@ export default function App() {
   };
 
   // Custom filtering algorithm for home events
-  const filteredExperiences = EXPERIENCES.filter((exp) => {
+  const filteredExperiences = experiencesList.filter((exp) => {
     const matchesCategory = selectedCategory === 'All' || exp.category === selectedCategory;
     const matchesSearch = exp.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           exp.location.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -599,6 +755,14 @@ export default function App() {
             >
               My Bookings {(requests.length > 0 || completedBookings.length > 0) && <span className="bg-brand-clay text-white rounded-full px-1.5 py-0.5 text-[9px] flex items-center justify-center font-mono font-bold">{requests.length + completedBookings.length}</span>}
             </button>
+            {currentUser?.isAdmin && (
+              <button 
+                onClick={() => { setCurrentTab('admin'); setSelectedEventId(null); }}
+                className={`hover:text-brand-gold pb-1 border-b transition-all duration-200 font-bold ${currentTab === 'admin' ? 'text-brand-gold border-brand-gold' : 'border-transparent text-brand-gold/90'}`}
+              >
+                Admin Console
+              </button>
+            )}
           </nav>
 
           {/* ZONE 3: 1-2 primary actions */}
@@ -643,6 +807,14 @@ export default function App() {
                   >
                     My Portfolio / Bookings
                   </button>
+                  {currentUser.isAdmin && (
+                    <button
+                      onClick={() => { setCurrentTab('admin'); setSelectedEventId(null); }}
+                      className="w-full text-left px-3.5 py-2 hover:bg-brand-green-light text-brand-gold font-semibold transition border-t border-brand-gold/10"
+                    >
+                      Admin Console
+                    </button>
+                  )}
                   <button
                     onClick={handleSignOut}
                     className="w-full text-left px-3.5 py-2 hover:bg-brand-green-light hover:text-brand-clay transition border-t border-brand-gold/10"
@@ -715,6 +887,14 @@ export default function App() {
                 <span>My Bookings</span>
                 <span className="bg-brand-clay text-white text-xs rounded-full px-2 py-0.5">{requests.length + completedBookings.length}</span>
               </button>
+              {currentUser?.isAdmin && (
+                <button 
+                  onClick={() => { setCurrentTab('admin'); setSelectedEventId(null); setMobileMenuOpen(false); }}
+                  className={`w-full text-left py-2 px-3 text-sm font-bold uppercase tracking-wider rounded transition-all ${currentTab === 'admin' ? 'bg-brand-green-light text-brand-gold border-l-2 border-brand-gold' : 'text-brand-gold hover:text-brand-gold-light'}`}
+                >
+                  Admin Console
+                </button>
+              )}
 
               {currentUser ? (
                 <div className="border-t border-brand-gold/15 pt-2.5 px-3 flex flex-col gap-1.5">
@@ -1036,7 +1216,7 @@ export default function App() {
         {/* VIEW 2: EXPERIENCE DETAIL & TACTILE CONCISE CUSTOMIZER */}
         {selectedEventId && (
           (() => {
-            const exp = EXPERIENCES.find(e => e.id === selectedEventId);
+            const exp = experiencesList.find(e => e.id === selectedEventId);
             if (!exp) return <p className="text-center py-10 font-serif text-brand-green">Experience not found.</p>;
             const isSaved = wishlist.includes(exp.id);
 
@@ -1612,7 +1792,7 @@ export default function App() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {EXPERIENCES.filter(exp => wishlist.includes(exp.id)).map((experience) => {
+                {experiencesList.filter(exp => wishlist.includes(exp.id)).map((experience) => {
                   return (
                     <div 
                       key={experience.id}
@@ -2403,6 +2583,447 @@ export default function App() {
 
               </div>
             )}
+          </div>
+        )}
+
+        {/* VIEW 7: ADMIN/MANAGEMENT CONSOLE */}
+        {currentTab === 'admin' && currentUser?.isAdmin && (
+          <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 animate-fadeIn text-brand-green">
+            
+            {/* Header section with KPIs */}
+            <div className="space-y-3 pb-6 border-b border-brand-green/10 mb-8">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+                <div>
+                  <h1 className="text-3xl md:text-4xl font-serif font-bold tracking-wide">
+                    Sovereign Management Console
+                  </h1>
+                  <p className="text-xs text-brand-green/60 uppercase tracking-widest mt-1">
+                    Configure official experiences catalog, track premium transactions, and process concierge proposals
+                  </p>
+                </div>
+                
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setAdminSubTab('events')}
+                    className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded transition ${adminSubTab === 'events' ? 'bg-brand-green text-brand-sand shadow' : 'bg-brand-sand-dark text-brand-green hover:bg-brand-sand'}`}
+                  >
+                    Experiences Configurator
+                  </button>
+                  <button
+                    onClick={() => setAdminSubTab('purchases')}
+                    className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded transition ${adminSubTab === 'purchases' ? 'bg-brand-green text-brand-sand shadow' : 'bg-brand-sand-dark text-brand-green hover:bg-brand-sand'}`}
+                  >
+                    Purchase & Quote Tracker
+                  </button>
+                </div>
+              </div>
+
+              {/* STATS HIGHLIGHTS BAR */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
+                <div className="bg-white p-4 rounded border border-brand-green/10 text-center space-y-1">
+                  <span className="text-[10px] text-brand-green/50 uppercase block font-bold">TOTAL RESERVATIONS REVENUE</span>
+                  <p className="font-serif text-2xl font-bold text-brand-clay font-mono">
+                    £{completedBookings.reduce((acc, curr) => acc + curr.total, 0).toLocaleString()}
+                  </p>
+                </div>
+                <div className="bg-white p-4 rounded border border-brand-green/10 text-center space-y-1">
+                  <span className="text-[10px] text-brand-green/50 uppercase block font-bold">VIP ATTENDEES SECURED</span>
+                  <p className="font-serif text-2xl font-bold text-brand-green font-mono">
+                    {completedBookings.reduce((acc, curr) => acc + curr.guests, 0)} Passengers
+                  </p>
+                </div>
+                <div className="bg-white p-4 rounded border border-brand-green/10 text-center space-y-1">
+                  <span className="text-[10px] text-brand-green/50 uppercase block font-bold">ACTIVE PROPOSALS LOGGED</span>
+                  <p className="font-serif text-2xl font-bold text-[#3b82f6] font-mono">
+                    {requests.length} Quotes
+                  </p>
+                </div>
+                <div className="bg-white p-4 rounded border border-brand-green/10 text-center space-y-1">
+                  <span className="text-[10px] text-brand-green/50 uppercase block font-bold">OFFICIAL CATALOG LISTINGS</span>
+                  <p className="font-serif text-2xl font-bold text-brand-gold font-mono">
+                    {experiencesList.length} Active Events
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* TAB 1: EXPERIENCES CONFIGURATOR (ADD/EDIT EVENTS) */}
+            {adminSubTab === 'events' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                
+                {/* CONFIGURATOR FORM (5 cols) */}
+                <div className="lg:col-span-5 bg-white p-6 rounded-lg border border-brand-green/15 shadow-md space-y-4">
+                  <div>
+                    <h3 className="font-serif text-lg font-bold">
+                      {editingEventId ? 'Modify Event Settings' : 'Publish New Luxury Event'}
+                    </h3>
+                    <p className="text-[11px] text-brand-green/60">
+                      Configure seat allotments, description assets, and pricing tier benefits
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleSaveEvent} className="space-y-4">
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Event Title *</span>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Roland Garros, Super Bowl"
+                        value={adminEventForm.title}
+                        onChange={(e) => setAdminEventForm({ ...adminEventForm, title: e.target.value })}
+                        className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Category Focus *</span>
+                        <select
+                          value={adminEventForm.category}
+                          onChange={(e) => setAdminEventForm({ ...adminEventForm, category: e.target.value as any })}
+                          className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-green font-medium"
+                        >
+                          <option value="Tennis">Tennis</option>
+                          <option value="Motorsport">Motorsport</option>
+                          <option value="Football">Football</option>
+                          <option value="Music">Music</option>
+                          <option value="Golf">Golf</option>
+                          <option value="Rugby">Rugby</option>
+                          <option value="Basketball">Basketball</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Event Dates *</span>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. May 24 – June 7, 2026"
+                          value={adminEventForm.dates}
+                          onChange={(e) => setAdminEventForm({ ...adminEventForm, dates: e.target.value })}
+                          className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">City & Country *</span>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Paris, France"
+                          value={adminEventForm.location}
+                          onChange={(e) => setAdminEventForm({ ...adminEventForm, location: e.target.value })}
+                          className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Arena / Venue *</span>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Stade de France"
+                          value={adminEventForm.venue}
+                          onChange={(e) => setAdminEventForm({ ...adminEventForm, venue: e.target.value })}
+                          className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Luxury Tagline</span>
+                        <input
+                          type="text"
+                          placeholder="e.g. L’Art de Vivre d’Élite"
+                          value={adminEventForm.tagline}
+                          onChange={(e) => setAdminEventForm({ ...adminEventForm, tagline: e.target.value })}
+                          className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Highlight Benefit</span>
+                        <input
+                          type="text"
+                          placeholder="e.g. Michelin lunch, Category 1 seat"
+                          value={adminEventForm.highlightBenefit}
+                          onChange={(e) => setAdminEventForm({ ...adminEventForm, highlightBenefit: e.target.value })}
+                          className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Image URL Reference</span>
+                      <input
+                        type="text"
+                        placeholder="/assets/images/elevate_hero_1791372544717.jpg"
+                        value={adminEventForm.image}
+                        onChange={(e) => setAdminEventForm({ ...adminEventForm, image: e.target.value })}
+                        className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none font-mono"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Short Editorial Description</span>
+                      <textarea
+                        rows={2}
+                        placeholder="Provide a glossy, high-end short overview for the event card..."
+                        value={adminEventForm.shortDescription}
+                        onChange={(e) => setAdminEventForm({ ...adminEventForm, shortDescription: e.target.value })}
+                        className="w-full bg-brand-sand-dark border border-brand-green/10 rounded p-2 text-xs focus:outline-none resize-none"
+                      />
+                    </div>
+
+                    {/* PRICING TIER 1 CONFIG */}
+                    <div className="p-3 bg-brand-sand-dark rounded border border-brand-gold/25 space-y-2">
+                      <span className="text-[9px] uppercase tracking-wider font-bold text-brand-green block">Package Tier 1 Configuration</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="Tier 1 Name (e.g. Pavilion Club)"
+                          value={adminEventForm.package1Name}
+                          onChange={(e) => setAdminEventForm({ ...adminEventForm, package1Name: e.target.value })}
+                          className="w-full bg-white border border-brand-green/10 rounded px-2.5 py-1.5 text-xs"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Price in GBP (£)"
+                          value={adminEventForm.package1Price}
+                          onChange={(e) => setAdminEventForm({ ...adminEventForm, package1Price: Number(e.target.value) })}
+                          className="w-full bg-white border border-brand-green/10 rounded px-2.5 py-1.5 text-xs font-mono"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Benefits (separated by commas)"
+                        value={adminEventForm.package1Benefits}
+                        onChange={(e) => setAdminEventForm({ ...adminEventForm, package1Benefits: e.target.value })}
+                        className="w-full bg-white border border-brand-green/10 rounded px-2.5 py-1.5 text-xs"
+                      />
+                    </div>
+
+                    {/* PRICING TIER 2 CONFIG */}
+                    <div className="p-3 bg-brand-sand-dark rounded border border-brand-gold/25 space-y-2">
+                      <span className="text-[9px] uppercase tracking-wider font-bold text-brand-green block">Package Tier 2 Configuration</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="Tier 2 Name (e.g. President Suite)"
+                          value={adminEventForm.package2Name}
+                          onChange={(e) => setAdminEventForm({ ...adminEventForm, package2Name: e.target.value })}
+                          className="w-full bg-white border border-brand-green/10 rounded px-2.5 py-1.5 text-xs"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Price in GBP (£)"
+                          value={adminEventForm.package2Price}
+                          onChange={(e) => setAdminEventForm({ ...adminEventForm, package2Price: Number(e.target.value) })}
+                          className="w-full bg-white border border-brand-green/10 rounded px-2.5 py-1.5 text-xs font-mono"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Benefits (separated by commas)"
+                        value={adminEventForm.package2Benefits}
+                        onChange={(e) => setAdminEventForm({ ...adminEventForm, package2Benefits: e.target.value })}
+                        className="w-full bg-white border border-brand-green/10 rounded px-2.5 py-1.5 text-xs"
+                      />
+                    </div>
+
+                    <div className="flex gap-2.5 pt-1">
+                      {editingEventId && (
+                        <button
+                          type="button"
+                          onClick={handleResetEventForm}
+                          className="w-1/3 border border-brand-green/15 text-brand-green text-xs font-bold uppercase py-3 rounded-sm hover:bg-brand-sand transition"
+                        >
+                          Clear
+                        </button>
+                      )}
+                      <button
+                        type="submit"
+                        className="w-full bg-brand-clay hover:bg-brand-clay-dark text-white font-bold text-xs uppercase tracking-widest py-3 rounded-sm shadow transition duration-200"
+                      >
+                        {editingEventId ? 'Update Event Settings' : 'Publish & Sync Event'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* CURRENT CATALOG TABLE (7 cols) */}
+                <div className="lg:col-span-7 bg-white rounded-lg border border-brand-green/10 shadow-md overflow-hidden">
+                  <div className="bg-brand-sand-dark p-4 border-b border-brand-green/10 flex justify-between items-center">
+                    <span className="text-xs uppercase tracking-widest font-bold">Active Catalog Listings ({experiencesList.length})</span>
+                    <span className="text-[10px] text-brand-green/60 uppercase">Drives client portal live data</span>
+                  </div>
+
+                  <div className="divide-y divide-brand-green/10 max-h-[750px] overflow-y-auto">
+                    {experiencesList.map((exp) => (
+                      <div key={exp.id} className="p-4 flex justify-between items-center gap-4">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={exp.image}
+                            alt={exp.title}
+                            className="w-12 h-12 object-cover rounded border border-brand-green/5 shrink-0"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="space-y-0.5">
+                            <span className="text-[8px] bg-brand-green/10 text-brand-green px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">
+                              {exp.category}
+                            </span>
+                            <h4 className="font-serif text-sm font-bold text-brand-green">{exp.title}</h4>
+                            <p className="text-[10px] text-brand-green/60">{exp.venue}, {exp.location}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            onClick={() => handleEditEventStart(exp)}
+                            className="bg-brand-sand hover:bg-brand-gold-light/20 text-brand-green border border-brand-green/10 rounded px-3 py-1.5 text-xs font-bold transition"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteEvent(exp.id)}
+                            className="bg-red-50 hover:bg-red-100 text-brand-clay border border-brand-clay/10 rounded px-3 py-1.5 text-xs font-bold transition"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* TAB 2: PURCHASE & REQUEST TRACKER (DETAILED LISTS) */}
+            {adminSubTab === 'purchases' && (
+              <div className="space-y-10 animate-fadeIn">
+                
+                {/* 1. CONFIRMED DIRECT CLIENT PURCHASES */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-brand-green/10 pb-2">
+                    <h3 className="text-base uppercase tracking-wider font-bold text-brand-green">Confirmed Client Purchases ({completedBookings.length})</h3>
+                    <span className="text-[10px] text-brand-green/60 uppercase">Direct Secure Checkout Transactions</span>
+                  </div>
+
+                  {completedBookings.length === 0 ? (
+                    <div className="text-center py-10 bg-white rounded border border-brand-green/10 text-xs italic text-brand-green/60">
+                      No customer transactions recorded yet.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {completedBookings.map((booking) => (
+                        <div key={booking.bookingId} className="bg-white rounded border border-brand-green/15 overflow-hidden shadow-sm grid grid-cols-1 md:grid-cols-12 gap-4 p-4 items-center">
+                          <div className="md:col-span-4 space-y-1">
+                            <span className="text-[9px] font-mono text-brand-gold font-bold">{booking.bookingId} · Confirmed</span>
+                            <h4 className="font-serif text-base font-bold text-brand-green leading-snug">{booking.experienceTitle}</h4>
+                            <p className="text-xs text-brand-green/75">Suite: <strong className="text-brand-clay font-medium">{booking.tierName}</strong></p>
+                          </div>
+
+                          <div className="md:col-span-3 space-y-1 text-xs">
+                            <span className="text-[8px] text-brand-green/50 uppercase block font-semibold">ATTENDEE ROSTER ({booking.guests})</span>
+                            <div className="text-brand-dark/80 text-[11px] truncate max-w-[200px]">
+                              {booking.guestNames.join(', ')}
+                            </div>
+                          </div>
+
+                          <div className="md:col-span-3 space-y-1 text-xs">
+                            <span className="text-[8px] text-brand-green/50 uppercase block font-semibold">BILLING & PAYMENT DETAILS</span>
+                            <p className="font-medium text-brand-green font-mono">{booking.paymentCard}</p>
+                            <p className="text-[10px] text-brand-green/60">Processed on {booking.date}</p>
+                          </div>
+
+                          <div className="md:col-span-2 text-left md:text-right shrink-0">
+                            <span className="text-[8px] text-brand-green/50 uppercase block font-semibold">TARIFF CHARGED</span>
+                            <span className="font-mono text-base font-bold text-brand-clay">£{booking.total.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 2. PENDING REQUESTS QUOTES (ADMIN CAN INTERACTIVELY ADVANCE STATUS!) */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-brand-green/10 pb-2">
+                    <h3 className="text-base uppercase tracking-wider font-bold text-brand-green">Corporate Proposals & Passive Quotes ({requests.length})</h3>
+                    <span className="text-[10px] text-brand-green/60 uppercase"> concierge can advance status interactively</span>
+                  </div>
+
+                  {requests.length === 0 ? (
+                    <div className="text-center py-10 bg-white rounded border border-brand-green/10 text-xs italic text-brand-green/60">
+                      No concierge proposals logged.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {requests.map((req) => (
+                        <div key={req.requestId} className="bg-white rounded border border-brand-green/15 overflow-hidden shadow-sm p-5 space-y-4">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-brand-green/5">
+                            <div className="space-y-1">
+                              <span className="bg-brand-sand-dark text-brand-green text-[10px] font-mono px-2 py-0.5 rounded font-bold">{req.requestId}</span>
+                              <h4 className="font-serif text-base font-bold text-brand-green">{req.companyName}</h4>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <div className="text-xs">
+                                <span className="text-[8px] text-brand-green/50 uppercase block font-semibold">Inquiry Status</span>
+                                <select
+                                  value={req.status}
+                                  onChange={(e) => {
+                                    const nextStatus = e.target.value as any;
+                                    setRequests(prev => prev.map(r => r.requestId === req.requestId ? { ...r, status: nextStatus } : r));
+                                  }}
+                                  className="bg-brand-sand-dark border border-brand-green/10 rounded px-2.5 py-1 text-xs font-semibold text-brand-green focus:outline-none"
+                                >
+                                  <option value="Awaiting Agent">Awaiting Agent</option>
+                                  <option value="Proposal Ready">Proposal Ready</option>
+                                  <option value="Confirmed">Confirmed</option>
+                                </select>
+                              </div>
+
+                              <div className="text-right text-xs">
+                                <span className="text-[8px] text-brand-green/50 block uppercase">SUBMITTED ON</span>
+                                <span className="font-medium text-brand-green">{req.date}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
+                            <div className="space-y-1.5">
+                              <span className="text-[8px] text-brand-green/50 uppercase block font-semibold">Line Items Shortlisted</span>
+                              {req.items.map((it, idx) => (
+                                <p key={idx} className="font-medium">
+                                  {it.experienceTitle} ({it.guests} Guests) - <span className="font-mono text-brand-clay font-bold">£{it.total.toLocaleString()}</span>
+                                </p>
+                              ))}
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <span className="text-[8px] text-brand-green/50 uppercase block font-semibold">Corporate Representative</span>
+                              <p className="font-medium">{req.contactName}</p>
+                              <p className="text-brand-green/75">{req.email} · {req.phone}</p>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <span className="text-[8px] text-brand-green/50 uppercase block font-semibold">Special Directives / Notes</span>
+                              <p className="italic font-light text-brand-dark/85 leading-relaxed">
+                                "{req.vipNotes || 'No special directives logged.'}"
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            )}
+
           </div>
         )}
 
