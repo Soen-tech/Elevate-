@@ -9,7 +9,7 @@ export interface PackageTier {
 export interface Experience {
   id: string;
   title: string;
-  category: 'Tennis' | 'Motorsport' | 'Football' | 'Music' | 'Golf' | 'Heritage';
+  category: 'Tennis' | 'Motorsport' | 'Football' | 'Music' | 'Golf' | 'Heritage' | 'Rugby' | 'Basketball';
   location: string;
   venue: string;
   dates: string;
@@ -219,6 +219,86 @@ export const EXPERIENCES: Experience[] = [
           'Official tournament merchandise and individual souvenir gifts'
         ],
         description: 'The ultimate tennis fan’s dream. Centrally located within the grounds, putting you a heartbeat away from the royal box action.'
+      }
+    ]
+  },
+  {
+    id: 'six-nations',
+    title: 'Six Nations Rugby Championship',
+    category: 'Rugby',
+    location: 'Paris, France',
+    venue: 'Stade de France',
+    dates: 'February 7 – March 14, 2026',
+    image: '/assets/images/rugby_event_1791381084724.jpg',
+    tagline: 'Le Tournoi de l’Élite Européenne',
+    shortDescription: 'Savor the peak of European Rugby inside the exclusive presidential lounges of the legendary Stade de France.',
+    description: 'Experience the roar of Stade de France from the highest vantage point of private luxury. The Six Nations Tournament brings together Europe’s rugby giants in a test of pure power, strategy, and sportsmanship. Combine the adrenaline of international test match rugby with three-star French gastronomy, vintage Bordeaux blends, and dedicated host services.',
+    highlightBenefit: 'Presidential Suite Category 1 seats overlooking the half-way line, all-day premium open bar, and legendary player meeting.',
+    packages: [
+      {
+        name: 'Le Salon d’Honneur',
+        price: 850,
+        benefits: [
+          'Official Category 1 seating directly on the 50m line',
+          'Exquisite pre-match buffet dining curated by a master chef',
+          'Open bar offering selection of fine wines, beers, and spirits',
+          'Exclusive post-match briefing with rugby legends & pundits',
+          'Dedicated VIP entrance bypassing general stadium crowds'
+        ],
+        description: 'Perfect for passionate rugby connoisseurs looking for elite seat positioning and premium corporate entertainment.'
+      },
+      {
+        name: 'The Grand Slam Loge',
+        price: 1750,
+        badge: 'Most Prestigious',
+        benefits: [
+          'Private luxury loge with panoramic floor-to-ceiling glass',
+          'Bespoke four-course sit-down menu with wine pairing',
+          'All-day unlimited Bollinger Champagne and premier cru Bordeaux',
+          'Dedicated butler service and private in-loge catering',
+          'Gift box containing official tournament jersey & souvenir program'
+        ],
+        description: 'An unmatched private oasis designed for top-tier executive hospitality, providing sovereign views of the pitch.'
+      }
+    ]
+  },
+  {
+    id: 'nba-paris',
+    title: 'NBA Paris Game',
+    category: 'Basketball',
+    location: 'Paris, France',
+    venue: 'Bercy Accor Arena',
+    dates: 'January 22, 2026',
+    image: '/assets/images/basketball_event_1791381113513.jpg',
+    tagline: 'American Spectacle, Parisian Sophistication',
+    shortDescription: 'Witness courtside NBA action in Paris from highly exclusive private suites with VIP access to the official afterparties.',
+    description: 'The glamour and high-intensity energy of the NBA returns to the heart of Paris at the Accor Arena. Watch world-class basketball stars battle from premium courtside seats, or network inside elegant private lounges. Indulge in custom mixology, gourmet American-French fusion cuisine, and receive exclusive access to the official post-game VIP gala.',
+    highlightBenefit: 'Row 1 courtside seating, exclusive pre-game access, and invitations to the official NBA players afterparty.',
+    packages: [
+      {
+        name: 'The Courtside Club',
+        price: 1250,
+        benefits: [
+          'Guaranteed Row 1-3 courtside seating near the team benches',
+          'Access to the exclusive backstage VIP lounge before and after the game',
+          'Gourmet food stations with interactive chef demonstrations',
+          'Flowing Champagne, custom signature cocktails, and premium beers',
+          'Exclusive NBA souvenir merchandise gift bag'
+        ],
+        description: 'Feel the sweat and energy of the players. Unrivaled court proximity paired with high-end luxury styling.'
+      },
+      {
+        name: 'The All-Star Suite',
+        price: 2900,
+        badge: 'Ultra Elite',
+        benefits: [
+          'Private VIP suite on the main balcony with premium terrace seats',
+          'Custom French-American fusion dinner prepared in-suite',
+          'Pre-game shootaround court access and photograph on center court',
+          'Flowing Dom Pérignon champagne, top-shelf spirits, and fine wines',
+          'Two passes to the official closed-door NBA Paris Afterparty'
+        ],
+        description: 'For those seeking the ultimate entertainment canvas. A private suite experience combining the NBA glamour with French hospitality.'
       }
     ]
   }
