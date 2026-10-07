@@ -29,7 +29,13 @@ import {
   Send,
   PhoneCall,
   Clock,
-  Briefcase
+  Briefcase,
+  User,
+  Lock,
+  CreditCard,
+  QrCode,
+  Ticket,
+  CheckCircle2
 } from 'lucide-react';
 import { usePWAInstall } from './usePWAInstall';
 import { useOnlineStatus } from './useOnlineStatus';
@@ -40,6 +46,61 @@ export default function App() {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const isOnline = useOnlineStatus();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
+
+  // User auth state
+  const [currentUser, setCurrentUser] = useState<{
+    uid: string;
+    email: string;
+    name: string;
+    company: string;
+    phone: string;
+  } | null>(() => {
+    const saved = localStorage.getItem('elevate_current_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authTab, setAuthTab] = useState<'signin' | 'signup'>('signin');
+  const [authForm, setAuthForm] = useState({
+    email: '',
+    name: '',
+    company: '',
+    phone: '',
+    password: '',
+  });
+  const [authError, setAuthError] = useState('');
+
+  // Completed bookings state
+  const [completedBookings, setCompletedBookings] = useState<Array<{
+    bookingId: string;
+    date: string;
+    experienceId: string;
+    experienceTitle: string;
+    experienceLocation: string;
+    image: string;
+    tierName: string;
+    guests: number;
+    guestNames: string[];
+    pricePerGuest: number;
+    total: number;
+    upgradesList: string[];
+    paymentCard: string;
+    status: 'Confirmed & Issued';
+  }>>(() => {
+    const saved = localStorage.getItem('elevate_completed_bookings');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Checkout UI States
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [checkoutStep, setCheckoutStep] = useState<1 | 2>(1); // 1: guest list, 2: card payment
+  const [guestNames, setGuestNames] = useState<Record<string, string[]>>({}); // basketItemId -> list of names
+  const [cardDetails, setCardDetails] = useState({
+    number: '',
+    name: '',
+    expiry: '',
+    cvv: '',
+  });
 
   // Core navigation state
   const [currentTab, setCurrentTab] = useState<'home' | 'vip' | 'wishlist' | 'basket' | 'requests'>('home');
@@ -175,6 +236,31 @@ export default function App() {
     localStorage.setItem('elevate_requests', JSON.stringify(requests));
   }, [requests]);
 
+  useEffect(() => {
+    localStorage.setItem('elevate_current_user', currentUser ? JSON.stringify(currentUser) : '');
+  }, [currentUser]);
+
+  useEffect(() => {
+    localStorage.setItem('elevate_completed_bookings', JSON.stringify(completedBookings));
+  }, [completedBookings]);
+
+  // Seed default registered users for instant testing
+  useEffect(() => {
+    const users = localStorage.getItem('elevate_users');
+    if (!users) {
+      const defaultUsers = [
+        {
+          email: 'soentechnologies@gmail.com',
+          name: 'Soen Technologies',
+          company: 'Soen Tech Ltd',
+          phone: '+44 20 7946 0192',
+          password: '1234',
+        }
+      ];
+      localStorage.setItem('elevate_users', JSON.stringify(defaultUsers));
+    }
+  }, []);
+
   // Calculations for customizer
   const getUpgradeCost = (key: keyof typeof upgrades) => {
     switch (key) {
@@ -236,6 +322,128 @@ export default function App() {
       security: false,
       branding: false,
     });
+  };
+
+  // Sign In handler
+  const handleSignIn = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    const usersStr = localStorage.getItem('elevate_users');
+    const users = usersStr ? JSON.parse(usersStr) : [];
+    
+    const user = users.find((u: any) => u.email.toLowerCase() === authForm.email.toLowerCase() && u.password === authForm.password);
+    if (user) {
+      const loggedInUser = {
+        uid: `user-${Math.random().toString(36).substr(2, 9)}`,
+        email: user.email,
+        name: user.name,
+        company: user.company || '',
+        phone: user.phone || '',
+      };
+      setCurrentUser(loggedInUser);
+      setAuthModalOpen(false);
+      // Pre-fill card name
+      setCardDetails(prev => ({ ...prev, name: user.name }));
+      setAuthForm(prev => ({ ...prev, password: '' }));
+    } else {
+      setAuthError('Invalid email or access PIN. Try using soentechnologies@gmail.com with PIN 1234');
+    }
+  };
+
+  // Sign Up handler
+  const handleSignUp = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    if (!authForm.email || !authForm.name || !authForm.password) {
+      setAuthError('Please fill in all required fields.');
+      return;
+    }
+    const usersStr = localStorage.getItem('elevate_users');
+    const users = usersStr ? JSON.parse(usersStr) : [];
+    
+    const exists = users.some((u: any) => u.email.toLowerCase() === authForm.email.toLowerCase());
+    if (exists) {
+      setAuthError('This email is already registered. Please sign in instead.');
+      return;
+    }
+
+    const newUser = {
+      email: authForm.email,
+      name: authForm.name,
+      company: authForm.company,
+      phone: authForm.phone,
+      password: authForm.password,
+    };
+    users.push(newUser);
+    localStorage.setItem('elevate_users', JSON.stringify(users));
+
+    const loggedInUser = {
+      uid: `user-${Math.random().toString(36).substr(2, 9)}`,
+      email: newUser.email,
+      name: newUser.name,
+      company: newUser.company || '',
+      phone: newUser.phone || '',
+    };
+    setCurrentUser(loggedInUser);
+    setAuthModalOpen(false);
+    setCardDetails(prev => ({ ...prev, name: newUser.name }));
+    setAuthForm({ email: '', name: '', company: '', phone: '', password: '' });
+  };
+
+  // Sign Out handler
+  const handleSignOut = () => {
+    setCurrentUser(null);
+    setIsCheckingOut(false);
+    setCurrentTab('home');
+  };
+
+  // Checkout submission handler
+  const handleCompleteCheckout = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser || basket.length === 0) return;
+
+    // Generate completed bookings
+    const newBookings = basket.map(item => {
+      const activeUpgrades: string[] = [];
+      if (item.upgrades.chauffeur) activeUpgrades.push('Private Chauffeur');
+      if (item.upgrades.helicopter) activeUpgrades.push('Helicopter Transfer');
+      if (item.upgrades.michelinDining) activeUpgrades.push('Michelin Dining');
+      if (item.upgrades.security) activeUpgrades.push('Personal Concierge');
+      if (item.upgrades.branding) activeUpgrades.push('Suite VIP Branding');
+
+      // Get guest names
+      const attendeeNames = guestNames[item.id] || [];
+      const completeNames = Array.from({ length: item.guests }, (_, i) => {
+        return attendeeNames[i] || `VIP Guest ${i + 1} (${currentUser.name})`;
+      });
+
+      return {
+        bookingId: `ELV-2026-${Math.floor(100000 + Math.random() * 900000)}`,
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+        experienceId: item.experienceId,
+        experienceTitle: item.experienceTitle,
+        experienceLocation: item.experienceLocation,
+        image: item.image,
+        tierName: item.tier.name,
+        guests: item.guests,
+        guestNames: completeNames,
+        pricePerGuest: item.calculatedTotal / item.guests,
+        total: item.calculatedTotal,
+        upgradesList: activeUpgrades,
+        paymentCard: `AMEX Centurion (•••• ${cardDetails.number.slice(-4) || '8820'})`,
+        status: 'Confirmed & Issued' as const,
+      };
+    });
+
+    setCompletedBookings(prev => [...newBookings, ...prev]);
+    setBasket([]); // clear basket
+    setIsCheckingOut(false);
+    setCheckoutStep(1);
+    setGuestNames({});
+    setCardDetails({ number: '', name: '', expiry: '', cvv: '' });
+    
+    // Switch to My Bookings tab
+    setCurrentTab('requests');
   };
 
   // Submit direct basket inquiry
@@ -389,7 +597,7 @@ export default function App() {
               onClick={() => { setCurrentTab('requests'); setSelectedEventId(null); }}
               className={`hover:text-brand-gold pb-1 border-b transition-all duration-200 flex items-center gap-1.5 ${currentTab === 'requests' ? 'text-brand-gold border-brand-gold' : 'border-transparent text-brand-sand-dark'}`}
             >
-              Requests {requests.length > 0 && <span className="bg-[#3b82f6] text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center font-mono font-bold">{requests.length}</span>}
+              My Bookings {(requests.length > 0 || completedBookings.length > 0) && <span className="bg-brand-clay text-white rounded-full px-1.5 py-0.5 text-[9px] flex items-center justify-center font-mono font-bold">{requests.length + completedBookings.length}</span>}
             </button>
           </nav>
 
@@ -413,6 +621,42 @@ export default function App() {
                 className="hidden sm:flex items-center gap-1.5 rounded border border-brand-gold/40 hover:border-brand-gold text-brand-gold text-[11px] tracking-wider uppercase font-semibold px-3.5 py-1.5 transition"
               >
                 <span>Add to Home Screen</span>
+              </button>
+            )}
+
+            {currentUser ? (
+              <div className="relative group">
+                <button
+                  type="button"
+                  className="flex items-center gap-2 rounded bg-brand-green-light border border-brand-gold/40 hover:border-brand-gold text-brand-gold font-semibold text-[11px] tracking-wider uppercase px-3.5 py-2 transition shadow-sm"
+                >
+                  <User className="w-3.5 h-3.5 text-brand-gold" />
+                  <span className="max-w-[100px] truncate">{currentUser.name}</span>
+                </button>
+                <div className="absolute right-0 top-full mt-1.5 w-48 bg-brand-green border border-brand-gold/30 rounded-md shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 py-1 text-xs text-brand-sand-dark">
+                  <div className="px-3.5 py-2 border-b border-brand-gold/15 text-[10px] text-brand-gold uppercase tracking-wider font-semibold">
+                    Corporate Account
+                  </div>
+                  <button
+                    onClick={() => { setCurrentTab('requests'); setSelectedEventId(null); }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-brand-green-light hover:text-brand-gold transition"
+                  >
+                    My Portfolio / Bookings
+                  </button>
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full text-left px-3.5 py-2 hover:bg-brand-green-light hover:text-brand-clay transition border-t border-brand-gold/10"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button 
+                onClick={() => { setAuthTab('signin'); setAuthModalOpen(true); }}
+                className="border border-brand-gold hover:border-brand-gold-light hover:text-brand-gold text-brand-gold font-semibold text-[11px] uppercase tracking-widest px-4 py-2 rounded-sm transition whitespace-nowrap"
+              >
+                Sign In
               </button>
             )}
 
@@ -468,9 +712,30 @@ export default function App() {
                 onClick={() => { setCurrentTab('requests'); setSelectedEventId(null); setMobileMenuOpen(false); }}
                 className={`w-full text-left py-2 px-3 text-sm font-semibold uppercase tracking-wider rounded transition-all flex justify-between items-center ${currentTab === 'requests' ? 'bg-brand-green-light text-brand-gold border-l-2 border-brand-gold' : 'text-brand-sand-dark'}`}
               >
-                <span>Requests Log</span>
-                <span className="bg-[#3b82f6] text-white text-xs rounded-full px-2 py-0.5">{requests.length}</span>
+                <span>My Bookings</span>
+                <span className="bg-brand-clay text-white text-xs rounded-full px-2 py-0.5">{requests.length + completedBookings.length}</span>
               </button>
+
+              {currentUser ? (
+                <div className="border-t border-brand-gold/15 pt-2.5 px-3 flex flex-col gap-1.5">
+                  <div className="text-[10px] text-brand-gold uppercase tracking-wider font-semibold">Logged in: {currentUser.name}</div>
+                  <button 
+                    onClick={() => { handleSignOut(); setMobileMenuOpen(false); }}
+                    className="w-full text-left text-xs uppercase tracking-wider font-bold py-1 text-brand-clay"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              ) : (
+                <div className="border-t border-brand-gold/15 pt-2.5 px-3">
+                  <button 
+                    onClick={() => { setAuthTab('signin'); setAuthModalOpen(true); setMobileMenuOpen(false); }}
+                    className="w-full text-center rounded border border-brand-gold text-brand-gold text-xs uppercase font-bold py-2"
+                  >
+                    Sign In Member
+                  </button>
+                </div>
+              )}
             </div>
             
             {/* Mobile PWA Prompts */}
@@ -1485,80 +1750,318 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Submit Form (5 cols) */}
+                {/* Consolidated Panel (5 cols) */}
                 <div className="lg:col-span-5 bg-white p-6 rounded-lg border border-brand-green/15 shadow-md">
-                  <form onSubmit={handleSubmitBasketInquiry} className="space-y-4">
-                    <div>
-                      <h3 className="font-serif text-lg text-brand-green font-bold">Consolidated Inquiry Form</h3>
-                      <p className="text-[11px] text-brand-green/60">Fill in representative details to generate official pricing proposal decks</p>
-                    </div>
+                  
+                  {isCheckingOut ? (
+                    /* ACTIVE CHECKOUT CONTAINER */
+                    <div className="space-y-5 animate-fadeIn">
+                      <div>
+                        <div className="flex items-center gap-1.5 text-xs text-brand-clay uppercase tracking-wider font-bold mb-1">
+                          <CreditCard className="w-4 h-4" />
+                          <span>Secure Corporate Checkout</span>
+                        </div>
+                        <h3 className="font-serif text-lg text-brand-green font-bold">Complete VIP Reservation</h3>
+                        <p className="text-[11px] text-brand-green/60">
+                          Step {checkoutStep} of 2 · Authorized member session active
+                        </p>
+                      </div>
 
-                    <div className="space-y-1">
-                      <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">VIP / Client Name</span>
-                      <input 
-                        type="text" 
-                        required
-                        placeholder="e.g. Private Client / LVMH Partners"
-                        value={directInquiryDetails.companyName}
-                        onChange={(e) => setDirectInquiryDetails({...directInquiryDetails, companyName: e.target.value})}
-                        className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark"
-                      />
-                    </div>
+                      {checkoutStep === 1 ? (
+                        /* CHECKOUT STEP 1: GUEST LIST */
+                        <form onSubmit={(e) => { e.preventDefault(); setCheckoutStep(2); }} className="space-y-4">
+                          <div className="max-h-80 overflow-y-auto pr-1 space-y-4 divide-y divide-brand-green/10">
+                            {basket.map((item) => (
+                              <div key={item.id} className="space-y-2 pt-3 first:pt-0">
+                                <h4 className="text-xs uppercase tracking-wider font-bold text-brand-green">{item.experienceTitle}</h4>
+                                <p className="text-[10px] text-brand-green/60 italic leading-relaxed">
+                                  Provide guest credentials below to personalize their commemorative physical badges and security credentials:
+                                </p>
+                                <div className="space-y-2 mt-2">
+                                  {Array.from({ length: item.guests }).map((_, i) => (
+                                    <div key={i} className="flex gap-2 items-center">
+                                      <span className="text-[10px] text-brand-green font-semibold shrink-0 w-16">Guest {i + 1}:</span>
+                                      <input
+                                        type="text"
+                                        required
+                                        placeholder={`Attendee ${i + 1} Full Name`}
+                                        value={guestNames[item.id]?.[i] || ''}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          setGuestNames(prev => {
+                                            const current = prev[item.id] ? [...prev[item.id]] : [];
+                                            current[i] = val;
+                                            return { ...prev, [item.id]: current };
+                                          });
+                                        }}
+                                        className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-2.5 py-1.5 text-xs text-brand-dark focus:outline-none focus:ring-1 focus:ring-brand-gold"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
 
-                    <div className="space-y-1">
-                      <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Contact Representative</span>
-                      <input 
-                        type="text" 
-                        required
-                        placeholder="e.g. Jean-Luc Laurent"
-                        value={directInquiryDetails.contactName}
-                        onChange={(e) => setDirectInquiryDetails({...directInquiryDetails, contactName: e.target.value})}
-                        className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark"
-                      />
-                    </div>
+                          <div className="flex gap-3 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => setIsCheckingOut(false)}
+                              className="w-1/3 border border-brand-green/15 text-brand-green text-xs font-semibold uppercase py-3 rounded-sm hover:bg-brand-sand transition"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              className="w-2/3 bg-brand-green hover:bg-brand-green-light text-brand-sand font-bold text-xs uppercase tracking-widest py-3 rounded-sm shadow transition duration-200"
+                            >
+                              Next: Payment
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        /* CHECKOUT STEP 2: PAYMENT CARD DETAILS */
+                        <form onSubmit={handleCompleteCheckout} className="space-y-4">
+                          
+                          {/* Luxe Centurion Black Card Visual */}
+                          <div className="relative h-44 rounded-xl bg-gradient-to-br from-[#1C1F1E] via-[#0E100F] to-[#151716] border border-brand-gold/30 shadow-2xl p-5 text-brand-sand font-sans flex flex-col justify-between overflow-hidden">
+                            <div className="absolute inset-0 bg-white/[0.02] mix-blend-overlay"></div>
+                            
+                            {/* Gold Wordmark & Chip */}
+                            <div className="flex justify-between items-start">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[10px] tracking-[0.25em] text-brand-gold uppercase font-bold">E L E V A T E</span>
+                                <span className="text-[6px] tracking-wider text-brand-gold-light/60 uppercase">SOVEREIGN PRIVÉ MEMBERSHIP</span>
+                              </div>
+                              <div className="w-8 h-6 rounded bg-gradient-to-r from-brand-gold via-brand-gold-light to-brand-gold opacity-90 relative overflow-hidden flex items-center justify-center text-[7px] text-[#0F1E17] font-bold font-mono">
+                                <div className="absolute inset-0 bg-white/10 flex items-center justify-center">CHIP</div>
+                              </div>
+                            </div>
 
-                    <div className="space-y-1">
-                      <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Contact Email</span>
-                      <input 
-                        type="email" 
-                        required
-                        placeholder="uxhumekile@gmail.com"
-                        value={directInquiryDetails.email}
-                        onChange={(e) => setDirectInquiryDetails({...directInquiryDetails, email: e.target.value})}
-                        className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark"
-                      />
-                    </div>
+                            {/* Card Number */}
+                            <div className="text-sm font-mono tracking-[0.25em] text-brand-gold-light text-center">
+                              {cardDetails.number || '••••  ••••  ••••  8820'}
+                            </div>
 
-                    <div className="space-y-1">
-                      <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Telephone Number</span>
-                      <input 
-                        type="tel"
-                        required
-                        placeholder="e.g. +33 1 42 27 78"
-                        value={directInquiryDetails.phone}
-                        onChange={(e) => setDirectInquiryDetails({...directInquiryDetails, phone: e.target.value})}
-                        className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark"
-                      />
-                    </div>
+                            {/* Cardholder name & Expiry */}
+                            <div className="flex justify-between items-end text-[9px] font-medium text-brand-sand-dark">
+                              <div className="flex flex-col">
+                                <span className="text-[6px] text-brand-gold/50 uppercase">MEMBER INITIATOR</span>
+                                <span className="uppercase tracking-wider truncate max-w-[130px] font-serif italic text-brand-gold">
+                                  {cardDetails.name || currentUser?.name || 'MEMBER PRIVÉ'}
+                                </span>
+                              </div>
+                              <div className="flex flex-col text-right">
+                                <span className="text-[6px] text-brand-gold/50 uppercase">EXPIRES</span>
+                                <span className="font-mono tracking-wider">{cardDetails.expiry || '12 / 29'}</span>
+                              </div>
+                            </div>
+                          </div>
 
-                    <div className="space-y-1">
-                      <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Additional Directives</span>
-                      <textarea 
-                        rows={3}
-                        placeholder="Mention any specific requests such as hotel requirements, flight transfers, custom menus, VIP speech times, or legend meet & greets."
-                        value={directInquiryDetails.notes}
-                        onChange={(e) => setDirectInquiryDetails({...directInquiryDetails, notes: e.target.value})}
-                        className="w-full bg-brand-sand-dark border border-brand-green/10 rounded p-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark resize-none text-wrap"
-                      />
-                    </div>
+                          <p className="text-[10px] text-brand-green/60 text-center font-light leading-relaxed">
+                            Authorized payment session secures instant debenture validation with 100% money-back booking guarantee.
+                          </p>
 
-                    <button
-                      type="submit"
-                      className="w-full bg-brand-clay hover:bg-brand-clay-dark text-white font-bold text-xs uppercase tracking-widest py-3.5 rounded-sm shadow transition duration-200"
-                    >
-                      Dispatch Official Inquiry
-                    </button>
-                  </form>
+                          <div className="space-y-3 pt-1">
+                            <div className="space-y-1">
+                              <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Initiator Name on Card</span>
+                              <input
+                                type="text"
+                                required
+                                value={cardDetails.name}
+                                onChange={(e) => setCardDetails({ ...cardDetails, name: e.target.value })}
+                                className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Corporate Card Number</span>
+                              <input
+                                type="text"
+                                required
+                                placeholder="4000 1234 5678 8820"
+                                maxLength={19}
+                                value={cardDetails.number}
+                                onChange={(e) => {
+                                  // Simple space auto-insert for formatting
+                                  const val = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+                                  const matches = val.match(/\d{4,16}/g);
+                                  const match = (matches && matches[0]) || '';
+                                  const parts = [];
+                                  for (let i = 0, len = match.length; i < len; i += 4) {
+                                    parts.push(match.substring(i, i + 4));
+                                  }
+                                  setCardDetails({ ...cardDetails, number: parts.length > 0 ? parts.join(' ') : val });
+                                }}
+                                className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark font-mono"
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1">
+                                <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Expiry Date</span>
+                                <input
+                                  type="text"
+                                  required
+                                  placeholder="MM/YY"
+                                  maxLength={5}
+                                  value={cardDetails.expiry}
+                                  onChange={(e) => {
+                                    let val = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
+                                    if (val.length > 2) {
+                                      val = `${val.slice(0, 2)}/${val.slice(2, 4)}`;
+                                    }
+                                    setCardDetails({ ...cardDetails, expiry: val });
+                                  }}
+                                  className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark font-mono"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">CVV Code</span>
+                                <input
+                                  type="password"
+                                  required
+                                  placeholder="•••"
+                                  maxLength={4}
+                                  value={cardDetails.cvv}
+                                  onChange={(e) => setCardDetails({ ...cardDetails, cvv: e.target.value.replace(/[^0-9]/g, '') })}
+                                  className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark font-mono"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-3 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => setCheckoutStep(1)}
+                              className="w-1/3 border border-brand-green/15 text-brand-green text-xs font-semibold uppercase py-3 rounded-sm hover:bg-brand-sand transition"
+                            >
+                              Back
+                            </button>
+                            <button
+                              type="submit"
+                              className="w-2/3 bg-brand-clay hover:bg-brand-clay-dark text-white font-bold text-xs uppercase tracking-widest py-3 rounded-sm shadow transition duration-200"
+                            >
+                              Authorize Purchase
+                            </button>
+                          </div>
+                        </form>
+                      )}
+                    </div>
+                  ) : (
+                    /* NO-CHECKOUT PASSIVE STATE (Decision Gate) */
+                    <div className="space-y-6 text-brand-green">
+                      <div className="space-y-1">
+                        <h3 className="font-serif text-lg font-bold">Secure Purchase & Reservation</h3>
+                        <p className="text-[11px] text-brand-green/60">
+                          Deploy your selected elite assets. Choose your preferred processing route:
+                        </p>
+                      </div>
+
+                      <div className="space-y-4">
+                        {/* Option 1: Complete Secure Direct Purchase */}
+                        <div className="bg-brand-sand-dark border border-brand-gold/30 p-4 rounded-md space-y-3">
+                          <div className="flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-brand-clay">
+                            <CreditCard className="w-4 h-4 text-brand-gold shrink-0" />
+                            <span>Direct Secure Purchase</span>
+                          </div>
+                          <p className="text-[11px] leading-relaxed font-light text-brand-dark/85">
+                            Validate debenture seat numbers instantly, authorize secure payment billing, and print your physical luxury boarding passes immediately.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!currentUser) {
+                                setAuthTab('signin');
+                                setAuthModalOpen(true);
+                              } else {
+                                setIsCheckingOut(true);
+                                setCheckoutStep(1);
+                              }
+                            }}
+                            className="w-full bg-brand-clay hover:bg-brand-clay-dark text-white font-bold text-xs uppercase tracking-widest py-2.5 rounded-sm shadow transition duration-200"
+                          >
+                            Proceed to Secure Checkout
+                          </button>
+                        </div>
+
+                        {/* Option 2: Submit Passive Information Request */}
+                        <div className="border border-brand-green/10 p-4 rounded-md space-y-3">
+                          <div className="flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-brand-green">
+                            <Send className="w-4 h-4 shrink-0" />
+                            <span>Request Pricing Proposal</span>
+                          </div>
+                          <p className="text-[11px] leading-relaxed font-light text-brand-dark/85">
+                            Submit a traditional passive brief. An expert VIP concierge will construct a personalized PDF pitch deck and contact you within 24 hours.
+                          </p>
+                          
+                          {/* Expandable toggle or inline form */}
+                          <div className="pt-1.5 border-t border-brand-green/5 space-y-3.5">
+                            <form onSubmit={handleSubmitBasketInquiry} className="space-y-3.5">
+                              <div className="space-y-1">
+                                <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">VIP / Client Name</span>
+                                <input 
+                                  type="text" 
+                                  required
+                                  placeholder="e.g. Private Client / LVMH Partners"
+                                  value={directInquiryDetails.companyName}
+                                  onChange={(e) => setDirectInquiryDetails({...directInquiryDetails, companyName: e.target.value})}
+                                  className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-2.5 py-1.5 text-[11px] text-brand-dark focus:outline-none"
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                  <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Contact Representative</span>
+                                  <input 
+                                    type="text" 
+                                    required
+                                    placeholder="e.g. Jean-Luc"
+                                    value={directInquiryDetails.contactName}
+                                    onChange={(e) => setDirectInquiryDetails({...directInquiryDetails, contactName: e.target.value})}
+                                    className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-2.5 py-1.5 text-[11px] text-brand-dark focus:outline-none"
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Contact Email</span>
+                                  <input 
+                                    type="email" 
+                                    required
+                                    placeholder="email@example.com"
+                                    value={directInquiryDetails.email}
+                                    onChange={(e) => setDirectInquiryDetails({...directInquiryDetails, email: e.target.value})}
+                                    className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-2.5 py-1.5 text-[11px] text-brand-dark focus:outline-none"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="space-y-1">
+                                <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Telephone Number</span>
+                                <input 
+                                  type="tel"
+                                  required
+                                  placeholder="Telephone number"
+                                  value={directInquiryDetails.phone}
+                                  onChange={(e) => setDirectInquiryDetails({...directInquiryDetails, phone: e.target.value})}
+                                  className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-2.5 py-1.5 text-[11px] text-brand-dark focus:outline-none"
+                                />
+                              </div>
+
+                              <button
+                                type="submit"
+                                className="w-full border border-brand-green text-brand-green hover:bg-brand-sand font-bold text-xs uppercase tracking-widest py-2 rounded-sm transition duration-200"
+                              >
+                                Dispatch Concierge Inquiry
+                              </button>
+                            </form>
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+                  )}
                 </div>
 
               </div>
@@ -1567,143 +2070,337 @@ export default function App() {
         )}
 
 
-        {/* VIEW 6: REQUESTS LOG & STATUS INTERACTIVE BRIEF (PWA PERSISTENCE) */}
+        {/* VIEW 6: MY BOOKINGS & VIP PORTFOLIO (COMPLETED PURCHASES & REQUESTS) */}
         {currentTab === 'requests' && (
-          <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 animate-fadeIn">
-            <div className="space-y-3 pb-6 border-b border-brand-green/10 mb-8">
-              <h1 className="text-3xl md:text-4xl font-serif text-brand-green font-bold tracking-wide">
-                VIP Requests & Proposal Decks
-              </h1>
-              <p className="text-xs text-brand-green/60 uppercase tracking-widest">Real-time status updates and customized briefing documents assigned to your company</p>
+          <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 animate-fadeIn text-brand-green">
+            
+            {/* Header section */}
+            <div className="space-y-3 pb-6 border-b border-brand-green/10 mb-8 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
+              <div>
+                <h1 className="text-3xl md:text-4xl font-serif font-bold tracking-wide">
+                  Your VIP Portfolio
+                </h1>
+                <p className="text-xs text-brand-green/60 uppercase tracking-widest mt-1">
+                  Manage confirmed luxury reservations, boarding passes, and custom quote requests
+                </p>
+              </div>
+              
+              {currentUser && (
+                <div className="text-left md:text-right text-xs">
+                  <span className="text-[10px] uppercase text-brand-green/50 block">MEMBER CREDENTIAL</span>
+                  <span className="font-semibold text-brand-clay font-mono">{currentUser.email}</span>
+                </div>
+              )}
             </div>
 
-            {requests.length === 0 ? (
+            {completedBookings.length === 0 && requests.length === 0 ? (
+              /* EMPTY PORTFOLIO VIEW */
               <div className="text-center py-16 bg-white rounded-lg border border-brand-green/10 max-w-xl mx-auto space-y-4">
-                <Clock className="w-12 h-12 text-brand-green/20 mx-auto" />
-                <p className="text-lg font-serif text-brand-green font-medium">No previous requests logged.</p>
-                <p className="text-xs text-brand-dark/70 max-w-sm mx-auto">Once you submit an inquiry basket or a VIP planner brief, it will be catalogued here with direct agent assignment statuses.</p>
-                <button 
-                  onClick={() => setCurrentTab('home')}
-                  className="bg-brand-green hover:bg-brand-green-light text-brand-sand px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition"
-                >
-                  Browse Catalog
-                </button>
+                <Ticket className="w-12 h-12 text-brand-green/20 mx-auto" />
+                <p className="text-lg font-serif font-semibold">Your portfolio is currently empty.</p>
+                <p className="text-xs text-brand-dark/70 max-w-sm mx-auto">
+                  Log in to your corporate account, tailor a package in our catalog, and either complete a direct secure purchase or request an official proposal deck.
+                </p>
+                
+                <div className="flex gap-3 justify-center pt-2">
+                  {!currentUser && (
+                    <button
+                      onClick={() => { setAuthTab('signin'); setAuthModalOpen(true); }}
+                      className="border border-brand-green hover:bg-brand-sand text-brand-green px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition"
+                    >
+                      Member Sign In
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => setCurrentTab('home')}
+                    className="bg-brand-green hover:bg-brand-green-light text-brand-sand px-5 py-2.5 rounded text-xs font-bold uppercase tracking-wider transition"
+                  >
+                    Browse Catalog
+                  </button>
+                </div>
               </div>
             ) : (
-              <div className="space-y-8">
-                {requests.map((req) => {
-                  return (
-                    <div key={req.requestId} className="bg-white rounded-lg border border-brand-green/15 shadow-md overflow-hidden">
-                      {/* Header with status */}
-                      <div className="bg-brand-green text-brand-sand p-4 md:px-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-brand-gold/20">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs text-brand-gold font-bold uppercase tracking-widest">PROPOSAL LOG</span>
-                            <span className="bg-brand-green-light border border-brand-gold/30 text-brand-gold text-[10px] font-mono px-2 py-0.5 rounded font-bold">
-                              {req.requestId}
-                            </span>
-                          </div>
-                          <h3 className="font-serif text-lg font-semibold tracking-wide text-white">{req.companyName}</h3>
-                        </div>
+              <div className="space-y-12">
+                
+                {/* COMPLETED BOOKINGS SECTION */}
+                {completedBookings.length > 0 && (
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2 pb-2 border-b border-brand-green/10">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                      <h2 className="text-lg uppercase tracking-wider font-bold">Confirmed Reservations ({completedBookings.length})</h2>
+                    </div>
 
-                        <div className="flex items-center gap-3">
-                          <div className="text-left md:text-right">
-                            <span className="text-[10px] text-brand-sand-dark block uppercase">SUBMITTED ON</span>
-                            <span className="text-xs font-medium">{req.date}</span>
-                          </div>
-
-                          <span className={`text-xs uppercase font-bold tracking-wider px-3 py-1.5 rounded-sm ${req.status === 'Proposal Ready' ? 'bg-[#10b981] text-white' : 'bg-brand-clay text-white animate-pulse'}`}>
-                            {req.status}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Details of items in request */}
-                      <div className="p-6 space-y-6">
-                        <div className="space-y-4">
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-brand-green border-b border-brand-green/10 pb-1.5">Shortlisted VIP Line-items</h4>
+                    <div className="space-y-8">
+                      {completedBookings.map((booking) => (
+                        <div key={booking.bookingId} className="bg-white rounded-lg border border-brand-green/15 shadow-md overflow-hidden">
                           
-                          <div className="space-y-4">
-                            {req.items.map((item, idx) => (
-                              <div key={idx} className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 py-1.5">
-                                <div className="space-y-1">
-                                  <h5 className="font-serif text-base font-bold text-brand-green">{item.experienceTitle}</h5>
-                                  <p className="text-xs text-brand-dark/80">
-                                    <span className="font-semibold text-brand-clay">{item.tierName} Suite</span> · {item.guests} VIP Attendees
-                                  </p>
-                                  
-                                  {/* Render upgrades list */}
-                                  {item.upgradesList && item.upgradesList.length > 0 && (
-                                    <div className="flex flex-wrap gap-1.5 pt-1.5">
-                                      {item.upgradesList.map((upg, uidx) => (
-                                        <span key={uidx} className="text-[9px] font-medium text-brand-green/80 bg-brand-sand-dark border border-brand-green/10 rounded px-1.5 py-0.5">
-                                          + {upg}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-
-                                <div className="text-left md:text-right shrink-0">
-                                  <span className="text-[10px] text-brand-green/60 uppercase block">INDICATIVE TARIFF</span>
-                                  <span className="font-mono text-sm font-bold text-brand-clay">£{item.total.toLocaleString()}</span>
-                                  <span className="text-[10px] text-brand-green/60 block mt-0.5">£{Math.round(item.pricePerGuest).toLocaleString()} / guest</span>
-                                </div>
+                          {/* Booking Banner Info */}
+                          <div className="bg-brand-green text-brand-sand px-5 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-brand-gold/20">
+                            <div className="space-y-0.5">
+                              <span className="text-[9px] uppercase tracking-widest text-brand-gold block font-semibold">RESERVATION SECURED</span>
+                              <h3 className="font-serif text-lg font-bold tracking-wide text-white">{booking.experienceTitle}</h3>
+                              <p className="text-[11px] text-brand-sand-dark font-light">{booking.experienceLocation} · {booking.tierName} Suite</p>
+                            </div>
+                            
+                            <div className="flex sm:flex-col items-start sm:items-end justify-between w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-brand-gold/15">
+                              <div className="text-xs">
+                                <span className="text-[8px] text-brand-gold-light uppercase block">ORDER ID</span>
+                                <span className="font-mono text-brand-gold font-bold">{booking.bookingId}</span>
                               </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* VIP metadata & interactive notes */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-brand-green/10 text-xs text-brand-green">
-                          <div className="space-y-2">
-                            <span className="text-[10px] text-brand-green/60 uppercase block font-bold tracking-wider">REPRESENTATIVE CONTACT</span>
-                            <div className="space-y-1 text-brand-dark/85">
-                              <p className="font-semibold">{req.contactName}</p>
-                              <p>{req.email}</p>
-                              {req.phone && <p>{req.phone}</p>}
+                              <div className="text-right ml-4 sm:ml-0 text-xs">
+                                <span className="text-[8px] text-brand-gold-light uppercase block">BILLING DATE</span>
+                                <span className="font-medium text-white">{booking.date}</span>
+                              </div>
                             </div>
                           </div>
 
-                          <div className="space-y-2">
-                            <span className="text-[10px] text-brand-green/60 uppercase block font-bold tracking-wider">NOTES & DIRECTIVES</span>
-                            <p className="text-brand-dark/85 italic leading-relaxed font-light text-wrap">
-                              {req.vipNotes || 'No special directives submitted. Suite mapping assigned standard central court priority.'}
-                            </p>
-                          </div>
-                        </div>
+                          {/* Guest Passes Grid */}
+                          <div className="p-5 bg-brand-sand/30">
+                            <span className="text-[10px] text-brand-green/50 uppercase tracking-widest font-bold block mb-4">Digital VIP Boarding Passes</span>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              {booking.guestNames.map((name, idx) => {
+                                const passId = `ELV-${booking.bookingId.split('-')[2]}-${100 + idx}`;
+                                return (
+                                  /* INDIVIDUAL BOARDING PASS */
+                                  <div key={idx} className="bg-brand-sand-dark rounded-xl border border-brand-gold/20 shadow-sm hover:shadow-md transition overflow-hidden flex flex-col justify-between">
+                                    {/* Pass Header */}
+                                    <div className="bg-gradient-to-r from-brand-green to-brand-green-light px-4 py-2.5 flex justify-between items-center text-brand-sand">
+                                      <div className="flex flex-col">
+                                        <span className="text-[7px] tracking-[0.2em] text-brand-gold font-bold uppercase">E L E V A T E</span>
+                                        <span className="text-[5px] uppercase tracking-wider text-brand-sand-dark/60 font-medium">VIP Hospitality Ticket</span>
+                                      </div>
+                                      <span className="font-mono text-[9px] text-brand-gold-light tracking-wider font-semibold">{passId}</span>
+                                    </div>
 
-                        {/* PDF / proposal download simulation */}
-                        <div className="bg-[#ECE5D3]/40 p-4 rounded border border-brand-green/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs">
-                          <div className="space-y-1">
-                            <p className="font-semibold text-brand-green flex items-center gap-1.5">
-                              <Star className="w-4 h-4 text-brand-gold shrink-0 fill-brand-gold" />
-                              {req.status === 'Proposal Ready' ? 'Official Interactive Pitch Deck Compiled' : 'Concierge Assigned: Antoine de Saint-Exupéry'}
-                            </p>
-                            <p className="text-brand-green/75 font-light">
-                              {req.status === 'Proposal Ready' 
-                                ? 'Contains custom floor layouts for Court Philippe-Chatrier, bespoke Michelin lunch courses, and official debenture ticket certifications.' 
-                                : 'Analyzing seating capacity availability. Real-time updates will automatically display here.'}
-                            </p>
+                                    {/* Pass Body */}
+                                    <div className="p-4 grid grid-cols-12 gap-3 items-center">
+                                      
+                                      {/* Left side details (8 cols) */}
+                                      <div className="col-span-8 space-y-2.5 text-[11px]">
+                                        <div>
+                                          <span className="text-[6px] text-brand-green/50 uppercase block font-semibold">ATTENDEE CREDENTIAL</span>
+                                          <span className="font-serif text-sm font-bold text-brand-green uppercase tracking-wide truncate max-w-[200px] block">
+                                            {name}
+                                          </span>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <div>
+                                            <span className="text-[6px] text-brand-green/50 uppercase block font-semibold">SEAT CORRIDOR</span>
+                                            <span className="font-semibold text-brand-clay font-mono block">Loge 102, S-C</span>
+                                          </div>
+                                          <div>
+                                            <span className="text-[6px] text-brand-green/50 uppercase block font-semibold">TIER SUITE</span>
+                                            <span className="font-semibold block truncate">{booking.tierName}</span>
+                                          </div>
+                                        </div>
+
+                                        {booking.upgradesList && booking.upgradesList.length > 0 && (
+                                          <div>
+                                            <span className="text-[6px] text-brand-green/50 uppercase block font-semibold mb-0.5">COMMITTED UPGRADES</span>
+                                            <div className="flex flex-wrap gap-1">
+                                              {booking.upgradesList.map((upg, uidx) => (
+                                                <span key={uidx} className="text-[7px] font-bold text-brand-green bg-white border border-brand-green/10 rounded px-1 py-0.5 uppercase">
+                                                  {upg.split(' ')[0]} {/* shortened */}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Right side QR Code (4 cols) */}
+                                      <div className="col-span-4 flex flex-col items-center justify-center border-l border-brand-green/10 pl-3">
+                                        <div className="w-16 h-16 bg-white border border-brand-green/15 rounded flex items-center justify-center p-1.5 shadow-inner">
+                                          {/* Styled vector-like representation of a secure premium QR Code */}
+                                          <div className="w-full h-full relative grid grid-cols-3 gap-0.5 opacity-90">
+                                            <div className="bg-brand-green border-[1.5px] border-white"></div>
+                                            <div className="bg-brand-green border-[1.5px] border-white"></div>
+                                            <div className="bg-transparent"></div>
+                                            <div className="bg-transparent"></div>
+                                            <div className="bg-brand-green border-[1.5px] border-white"></div>
+                                            <div className="bg-brand-green border-[1.5px] border-white"></div>
+                                            <div className="bg-brand-green border-[1.5px] border-white"></div>
+                                            <div className="bg-transparent"></div>
+                                            <div className="bg-brand-green border-[1.5px] border-white"></div>
+                                          </div>
+                                        </div>
+                                        <span className="text-[5px] text-brand-green/50 mt-1 uppercase font-bold tracking-wider">SCAN GATE</span>
+                                      </div>
+
+                                    </div>
+
+                                    {/* Pass Footer */}
+                                    <div className="bg-white border-t border-brand-green/5 px-4 py-2 flex justify-between items-center text-[9px] text-brand-green/75">
+                                      <span className="font-light truncate max-w-[140px]">{booking.experienceLocation}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => alert(`Simulating PDF ticket download for ${name}. (Pass ID: ${passId})`)}
+                                        className="text-brand-clay hover:text-brand-clay-dark font-bold uppercase tracking-wider flex items-center gap-0.5"
+                                      >
+                                        <Download className="w-2.5 h-2.5" />
+                                        <span>Download PDF</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
 
-                          {req.status === 'Proposal Ready' && (
+                          {/* Booking Details Footer */}
+                          <div className="bg-brand-sand-dark px-6 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-xs">
+                            <div className="space-y-1">
+                              <p className="font-semibold flex items-center gap-1.5 text-brand-green">
+                                <ShieldCheck className="w-4 h-4 text-brand-gold fill-brand-gold/20" />
+                                <span>Official Debenture Seats Guaranteed</span>
+                              </p>
+                              <p className="text-brand-green/75 font-light">
+                                Authenticated transaction via {booking.paymentCard}. Digital badges issued. Your dedicated concierge has emailed you the full itinerary.
+                              </p>
+                            </div>
+
                             <button
                               type="button"
-                              onClick={() => {
-                                alert(`Downloading compiled PDF proposal for ${req.companyName} (File ID: ${req.requestId}_Brief.pdf)`);
-                              }}
-                              className="bg-brand-green hover:bg-brand-green-light text-brand-sand px-4 py-2 rounded text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition shrink-0"
+                              onClick={() => alert(`Printing invoice receipt for reservation ${booking.bookingId}`)}
+                              className="border border-brand-green/15 text-brand-green hover:bg-brand-sand hover:border-brand-green px-4 py-2 rounded text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 transition shrink-0"
                             >
-                              <Download className="w-4 h-4 text-brand-gold" />
-                              <span>Download Pitch Deck</span>
+                              <Download className="w-3.5 h-3.5" />
+                              <span>Receipt Invoice</span>
                             </button>
-                          )}
+                          </div>
+
                         </div>
-                      </div>
+                      ))}
                     </div>
-                  );
-                })}
+                  </div>
+                )}
+
+                {/* PENDING REQUESTS LOG SECTION */}
+                {requests.length > 0 && (
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-2 pb-2 border-b border-brand-green/10">
+                      <Clock className="w-5 h-5 text-brand-clay" />
+                      <h2 className="text-lg uppercase tracking-wider font-bold">Active Proposal Quotes & Inquiry Logs ({requests.length})</h2>
+                    </div>
+
+                    <div className="space-y-8">
+                      {requests.map((req) => (
+                        <div key={req.requestId} className="bg-white rounded-lg border border-brand-green/15 shadow-md overflow-hidden">
+                          {/* Header with status */}
+                          <div className="bg-brand-green text-brand-sand p-4 md:px-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-brand-gold/20">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs text-brand-gold font-bold uppercase tracking-widest">PROPOSAL LOG</span>
+                                <span className="bg-brand-green-light border border-brand-gold/30 text-brand-gold text-[10px] font-mono px-2 py-0.5 rounded font-bold">
+                                  {req.requestId}
+                                </span>
+                              </div>
+                              <h3 className="font-serif text-lg font-semibold tracking-wide text-white">{req.companyName}</h3>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <div className="text-left md:text-right">
+                                <span className="text-[10px] text-brand-sand-dark block uppercase">SUBMITTED ON</span>
+                                <span className="text-xs font-medium">{req.date}</span>
+                              </div>
+
+                              <span className={`text-xs uppercase font-bold tracking-wider px-3 py-1.5 rounded-sm ${req.status === 'Proposal Ready' ? 'bg-[#10b981] text-white' : 'bg-brand-clay text-white animate-pulse'}`}>
+                                {req.status}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Details of items in request */}
+                          <div className="p-6 space-y-6">
+                            <div className="space-y-4">
+                              <h4 className="text-xs font-bold uppercase tracking-wider text-brand-green border-b border-brand-green/10 pb-1.5">Shortlisted VIP Line-items</h4>
+                              
+                              <div className="space-y-4">
+                                {req.items.map((item, idx) => (
+                                  <div key={idx} className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 py-1.5">
+                                    <div className="space-y-1">
+                                      <h5 className="font-serif text-base font-bold text-brand-green">{item.experienceTitle}</h5>
+                                      <p className="text-xs text-brand-dark/80">
+                                        <span className="font-semibold text-brand-clay">{item.tierName} Suite</span> · {item.guests} VIP Attendees
+                                      </p>
+                                      
+                                      {/* Render upgrades list */}
+                                      {item.upgradesList && item.upgradesList.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 pt-1.5">
+                                          {item.upgradesList.map((upg, uidx) => (
+                                            <span key={uidx} className="text-[9px] font-medium text-brand-green/80 bg-brand-sand-dark border border-brand-green/10 rounded px-1.5 py-0.5">
+                                              + {upg}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="text-left md:text-right shrink-0">
+                                      <span className="text-[10px] text-brand-green/60 uppercase block">INDICATIVE TARIFF</span>
+                                      <span className="font-mono text-sm font-bold text-brand-clay">£{item.total.toLocaleString()}</span>
+                                      <span className="text-[10px] text-brand-green/60 block mt-0.5">£{Math.round(item.pricePerGuest).toLocaleString()} / guest</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* VIP metadata & interactive notes */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-brand-green/10 text-xs text-brand-green">
+                              <div className="space-y-2">
+                                <span className="text-[10px] text-brand-green/60 uppercase block font-bold tracking-wider">REPRESENTATIVE CONTACT</span>
+                                <div className="space-y-1 text-brand-dark/85">
+                                  <p className="font-semibold">{req.contactName}</p>
+                                  <p>{req.email}</p>
+                                  {req.phone && <p>{req.phone}</p>}
+                                </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                <span className="text-[10px] text-brand-green/60 uppercase block font-bold tracking-wider">NOTES & DIRECTIVES</span>
+                                <p className="text-brand-dark/85 italic leading-relaxed font-light text-wrap">
+                                  {req.vipNotes || 'No special directives submitted. Suite mapping assigned standard central court priority.'}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* PDF / proposal download simulation */}
+                            <div className="bg-[#ECE5D3]/40 p-4 rounded border border-brand-green/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs">
+                              <div className="space-y-1">
+                                <p className="font-semibold text-brand-green flex items-center gap-1.5">
+                                  <Star className="w-4 h-4 text-brand-gold shrink-0 fill-brand-gold" />
+                                  {req.status === 'Proposal Ready' ? 'Official Interactive Pitch Deck Compiled' : 'Concierge Assigned: Antoine de Saint-Exupéry'}
+                                </p>
+                                <p className="text-brand-green/75 font-light">
+                                  {req.status === 'Proposal Ready' 
+                                    ? 'Contains custom floor layouts for Court Philippe-Chatrier, bespoke Michelin lunch courses, and official debenture ticket certifications.' 
+                                    : 'Analyzing seating capacity availability. Real-time updates will automatically display here.'}
+                                </p>
+                              </div>
+
+                              {req.status === 'Proposal Ready' && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    alert(`Downloading compiled PDF proposal for ${req.companyName} (File ID: ${req.requestId}_Brief.pdf)`);
+                                  }}
+                                  className="bg-brand-green hover:bg-brand-green-light text-brand-sand px-4 py-2 rounded text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition shrink-0"
+                                >
+                                  <Download className="w-4 h-4 text-brand-gold" />
+                                  <span>Download Pitch Deck</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
               </div>
             )}
           </div>
@@ -1811,6 +2508,186 @@ export default function App() {
             >
               Acknowledged
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* MEMBER ACCESS (AUTH) MODAL */}
+      {authModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-md rounded-lg bg-white overflow-hidden shadow-2xl border border-brand-gold/45 text-brand-green flex flex-col">
+            
+            {/* Modal Brand Banner */}
+            <div className="bg-brand-green p-6 text-brand-sand border-b border-brand-gold/30 flex justify-between items-start">
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] tracking-[0.25em] text-brand-gold uppercase font-semibold">E L E V A T E</span>
+                  <span className="text-[7px] text-brand-gold-light/60 uppercase">MEMBER PORTAL</span>
+                </div>
+                <h3 className="font-serif text-xl font-bold text-white">
+                  {authTab === 'signin' ? 'Verify Account Access' : 'Create Member Profile'}
+                </h3>
+                <p className="text-[11px] text-brand-sand-dark/80 font-light">
+                  {authTab === 'signin' ? 'Enter corporate credentials to authorize elite seat orders' : 'Establish verified portfolio identity and booking credentials'}
+                </p>
+              </div>
+              <button 
+                onClick={() => { setAuthModalOpen(false); setAuthError(''); }}
+                className="p-1.5 hover:bg-brand-green-light text-brand-gold-light hover:text-brand-clay rounded-full transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body & Forms */}
+            <div className="p-6 space-y-4">
+              
+              {/* Tabs Switcher */}
+              <div className="flex bg-brand-sand-dark p-1 rounded border border-brand-green/5 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => { setAuthTab('signin'); setAuthError(''); }}
+                  className={`w-1/2 py-2 text-center rounded transition ${authTab === 'signin' ? 'bg-brand-green text-brand-sand shadow-sm' : 'text-brand-green/60 hover:text-brand-green'}`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAuthTab('signup'); setAuthError(''); }}
+                  className={`w-1/2 py-2 text-center rounded transition ${authTab === 'signup' ? 'bg-brand-green text-brand-sand shadow-sm' : 'text-brand-green/60 hover:text-brand-green'}`}
+                >
+                  Create Profile
+                </button>
+              </div>
+
+              {authError && (
+                <div className="bg-red-50 border-l-2 border-brand-clay p-3 rounded-sm text-[11px] text-brand-clay font-medium leading-relaxed">
+                  {authError}
+                </div>
+              )}
+
+              {authTab === 'signin' ? (
+                /* SIGN IN FORM */
+                <form onSubmit={handleSignIn} className="space-y-4">
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Corporate Email Address</span>
+                    <div className="relative">
+                      <User className="absolute left-3 top-2.5 w-4 h-4 text-brand-green/40" />
+                      <input
+                        type="email"
+                        required
+                        placeholder="e.g. corporate@client.com"
+                        value={authForm.email}
+                        onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
+                        className="w-full bg-brand-sand-dark border border-brand-green/10 rounded pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Security Access PIN</span>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-2.5 w-4 h-4 text-brand-green/40" />
+                      <input
+                        type="password"
+                        required
+                        placeholder="Enter 4-digit PIN or password"
+                        value={authForm.password}
+                        onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+                        className="w-full bg-brand-sand-dark border border-brand-green/10 rounded pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full bg-brand-green hover:bg-brand-green-light text-brand-sand font-bold text-xs uppercase tracking-widest py-3 rounded-sm shadow transition duration-200"
+                  >
+                    Authenticate Membership
+                  </button>
+                </form>
+              ) : (
+                /* SIGN UP FORM */
+                <form onSubmit={handleSignUp} className="space-y-3.5">
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Initiator Full Name *</span>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Jean-Luc Laurent"
+                      value={authForm.name}
+                      onChange={(e) => setAuthForm({ ...authForm, name: e.target.value })}
+                      className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Corporate Email Address *</span>
+                    <input
+                      type="email"
+                      required
+                      placeholder="corporate@client.com"
+                      value={authForm.email}
+                      onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
+                      className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Company Name</span>
+                      <input
+                        type="text"
+                        placeholder="e.g. Vanguard Partners"
+                        value={authForm.company}
+                        onChange={(e) => setAuthForm({ ...authForm, company: e.target.value })}
+                        className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Corporate Telephone</span>
+                      <input
+                        type="tel"
+                        placeholder="e.g. +33 1 42..."
+                        value={authForm.phone}
+                        onChange={(e) => setAuthForm({ ...authForm, phone: e.target.value })}
+                        className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Create Security PIN *</span>
+                    <input
+                      type="password"
+                      required
+                      placeholder="Choose 4-digit PIN or password"
+                      value={authForm.password}
+                      onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+                      className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark font-mono"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full bg-brand-clay hover:bg-brand-clay-dark text-white font-bold text-xs uppercase tracking-widest py-3 rounded-sm shadow transition duration-200 mt-2"
+                  >
+                    Establish Luxury Membership
+                  </button>
+                </form>
+              )}
+
+              {/* DEMO / TEST CREDENTIAL INDICATOR (High usability) */}
+              <div className="mt-4 p-3 bg-brand-sand-dark rounded border border-brand-gold/20 text-[10px] space-y-1 text-brand-green">
+                <span className="font-bold text-brand-clay uppercase block tracking-wider">Instant System Testing Credentials:</span>
+                <p>To avoid filling forms, login instantly with our seeded corporate account:</p>
+                <div className="font-mono text-xs pt-1 flex justify-between">
+                  <span>Email: <strong className="text-brand-green">soentechnologies@gmail.com</strong></span>
+                  <span>Access PIN: <strong className="text-brand-green">1234</strong></span>
+                </div>
+              </div>
+
+            </div>
           </div>
         </div>
       )}
