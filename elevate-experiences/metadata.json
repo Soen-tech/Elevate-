@@ -1,0 +1,6 @@
+{
+  "name": "Elevate Experiences",
+  "description": "Premium VIP hospitality, sports debentures, & VIP entertainment PWA with French luxury aesthetics inspired by Roland Garros.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
