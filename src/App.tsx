@@ -507,7 +507,7 @@ export default function App() {
             <div className="relative bg-brand-green text-brand-sand min-h-[520px] flex flex-col justify-center overflow-hidden">
               <div className="absolute inset-0 z-0">
                 <img 
-                  src="/src/assets/images/elevate_hero_1791372544717.jpg" 
+                  src="/assets/images/elevate_hero_1791372544717.jpg" 
                   alt="Luxury Tennis Hospitality Suite"
                   className="w-full h-full object-cover object-center opacity-45 mix-blend-multiply"
                   referrerPolicy="no-referrer"
