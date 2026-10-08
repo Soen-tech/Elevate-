@@ -75,6 +75,60 @@ export default function App() {
     return EXPERIENCES;
   });
 
+  // Global Upgrades list state for dynamic additions and pricing edits
+  const [globalUpgrades, setGlobalUpgrades] = useState<Array<{
+    id: string;
+    name: string;
+    description: string;
+    cost: number;
+    icon: 'Car' | 'Plane' | 'Wine' | 'ShieldCheck' | 'Briefcase' | 'Coffee';
+  }>>(() => {
+    const saved = localStorage.getItem('elevate_global_upgrades');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return [
+      { id: 'chauffeur', name: 'Private Chauffeur Service', description: 'Mercedes S-Class luxury airport/venue transfers', cost: 250, icon: 'Car' },
+      { id: 'helicopter', name: 'Helicopter Transit', description: 'Direct heli-port dropoff (Monaco/Paris/London)', cost: 850, icon: 'Plane' },
+      { id: 'michelinDining', name: 'Pre-Event Michelin Dining', description: 'Exclusive tasting menu with wine pairings', cost: 400, icon: 'Wine' },
+      { id: 'security', name: 'Personal VIP Concierge', description: 'On-site host, hostesses, and personal security', cost: 300, icon: 'ShieldCheck' },
+      { id: 'branding', name: 'Suite VIP Branding', description: 'Custom VIP signage, logos, and color palettes', cost: 150, icon: 'Briefcase' },
+    ];
+  });
+
+  // Dynamic Event Packages configuration editor state
+  const [adminEventPackages, setAdminEventPackages] = useState<PackageTier[]>(() => [
+    {
+      name: 'The Pavilion Club',
+      price: 750,
+      benefits: ['Premium padded seating', 'Gourmet buffet', 'Fine wines & champagne'],
+      description: 'Standard luxury hospitality with prime seat allotments and catered food/bars.'
+    },
+    {
+      name: 'The President’s Suite',
+      price: 2200,
+      benefits: ['Front-row Box Seating', 'Five-course private menu', 'Dedicated butler', 'Chauffeur transfers'],
+      description: 'Ultra-exclusive private suite access with bespoke dining, personal butler, and custom transfers.'
+    }
+  ]);
+
+  // Dynamic list of active upgrade IDs for the event being configured
+  const [adminEventUpgrades, setAdminEventUpgrades] = useState<string[]>([]);
+
+  // Upgrades editor state
+  const [editingUpgradeId, setEditingUpgradeId] = useState<string | null>(null);
+  const [adminUpgradeForm, setAdminUpgradeForm] = useState({
+    id: '',
+    name: '',
+    description: '',
+    cost: 100,
+    icon: 'Coffee' as any,
+  });
+
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authTab, setAuthTab] = useState<'signin' | 'signup'>('signin');
   const [authForm, setAuthForm] = useState({
@@ -119,7 +173,7 @@ export default function App() {
   });
 
   // Admin Dashboard States
-  const [adminSubTab, setAdminSubTab] = useState<'events' | 'purchases'>('events');
+  const [adminSubTab, setAdminSubTab] = useState<'events' | 'purchases' | 'upgrades'>('events');
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [adminEventForm, setAdminEventForm] = useState({
     title: '',
@@ -188,13 +242,7 @@ export default function App() {
   // Customizer state
   const [selectedTier, setSelectedTier] = useState<PackageTier | null>(null);
   const [customGuests, setCustomGuests] = useState<number>(4);
-  const [upgrades, setUpgrades] = useState({
-    chauffeur: false,
-    helicopter: false,
-    michelinDining: false,
-    security: false,
-    branding: false,
-  });
+  const [upgrades, setUpgrades] = useState<Record<string, boolean>>({});
 
   // Saved Wishlist state
   const [wishlist, setWishlist] = useState<string[]>(() => {
@@ -211,7 +259,7 @@ export default function App() {
     image: string;
     tier: PackageTier;
     guests: number;
-    upgrades: typeof upgrades;
+    upgrades: Record<string, boolean>;
     calculatedTotal: number;
   }>>(() => {
     const saved = localStorage.getItem('elevate_basket');
@@ -270,10 +318,10 @@ export default function App() {
   const [vipBudget, setCorpBudget] = useState<number>(1500);
   const [vipGuests, setCorpGuests] = useState<number>(20);
   const [vipCategory, setCorpCategory] = useState<'Tennis' | 'Motorsport' | 'Music' | 'Golf' | 'Rugby' | 'Basketball' | 'Cricket' | 'All'>('All');
-  const [vipUpgrades, setCorpUpgrades] = useState({
+  const [vipUpgrades, setCorpUpgrades] = useState<Record<string, boolean>>({
     chauffeur: true,
     helicopter: false,
-    concierge: true,
+    security: true,
     branding: true,
   });
   const [vipInquirySubmitted, setCorpInquirySubmitted] = useState(false);
@@ -320,6 +368,10 @@ export default function App() {
     localStorage.setItem('elevate_experiences_list', JSON.stringify(experiencesList));
   }, [experiencesList]);
 
+  useEffect(() => {
+    localStorage.setItem('elevate_global_upgrades', JSON.stringify(globalUpgrades));
+  }, [globalUpgrades]);
+
   // Seed default registered users for instant testing
   useEffect(() => {
     const usersStr = localStorage.getItem('elevate_users');
@@ -362,30 +414,28 @@ export default function App() {
   }, [currentUser]);
 
   // Calculations for customizer
-  const getUpgradeCost = (key: keyof typeof upgrades) => {
-    switch (key) {
-      case 'chauffeur': return 250;
-      case 'helicopter': return 850;
-      case 'michelinDining': return 400;
-      case 'security': return 300;
-      case 'branding': return 150;
-      default: return 0;
-    }
+  const getUpgradeCost = (key: string) => {
+    const matchingUpg = globalUpgrades.find(u => u.id === key);
+    return matchingUpg ? matchingUpg.cost : 0;
   };
 
   const calculateCustomizerTotal = () => {
     if (!selectedTier) return 0;
+    const exp = experiencesList.find(e => e.id === selectedEventId);
     let basePrice = selectedTier.price;
     let upgradeTotal = 0;
-    (Object.keys(upgrades) as Array<keyof typeof upgrades>).forEach((key) => {
+    Object.keys(upgrades).forEach((key) => {
       if (upgrades[key]) {
-        upgradeTotal += getUpgradeCost(key);
+        const isUpgAvailable = !exp || !exp.upgrades || exp.upgrades.length === 0 || exp.upgrades.includes(key);
+        if (isUpgAvailable) {
+          upgradeTotal += getUpgradeCost(key);
+        }
       }
     });
     return (basePrice + upgradeTotal) * customGuests;
   };
 
-  const handleToggleUpgrade = (key: keyof typeof upgrades) => {
+  const handleToggleUpgrade = (key: string) => {
     setUpgrades(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
@@ -400,6 +450,16 @@ export default function App() {
   // Add customized package to basket
   const handleAddToBasket = (experience: Experience) => {
     if (!selectedTier) return;
+    const activeUpgradesOnly: Record<string, boolean> = {};
+    Object.keys(upgrades).forEach((key) => {
+      if (upgrades[key]) {
+        const isUpgAvailable = !experience.upgrades || experience.upgrades.length === 0 || experience.upgrades.includes(key);
+        if (isUpgAvailable) {
+          activeUpgradesOnly[key] = true;
+        }
+      }
+    });
+
     const newItem = {
       id: `basket-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       experienceId: experience.id,
@@ -408,20 +468,14 @@ export default function App() {
       image: experience.image,
       tier: selectedTier,
       guests: customGuests,
-      upgrades: { ...upgrades },
+      upgrades: activeUpgradesOnly,
       calculatedTotal: calculateCustomizerTotal(),
     };
     setBasket(prev => [...prev, newItem]);
     setCurrentTab('basket');
     setSelectedEventId(null);
     // Reset tailor states
-    setUpgrades({
-      chauffeur: false,
-      helicopter: false,
-      michelinDining: false,
-      security: false,
-      branding: false,
-    });
+    setUpgrades({});
   };
 
   // Sign In handler
@@ -506,11 +560,14 @@ export default function App() {
     // Generate completed bookings
     const newBookings = basket.map(item => {
       const activeUpgrades: string[] = [];
-      if (item.upgrades.chauffeur) activeUpgrades.push('Private Chauffeur');
-      if (item.upgrades.helicopter) activeUpgrades.push('Helicopter Transfer');
-      if (item.upgrades.michelinDining) activeUpgrades.push('Michelin Dining');
-      if (item.upgrades.security) activeUpgrades.push('Personal Concierge');
-      if (item.upgrades.branding) activeUpgrades.push('Suite VIP Branding');
+      Object.keys(item.upgrades).forEach(key => {
+        if (item.upgrades[key]) {
+          const matchingUpg = globalUpgrades.find(u => u.id === key);
+          if (matchingUpg) {
+            activeUpgrades.push(matchingUpg.name);
+          }
+        }
+      });
 
       // Get guest names
       const attendeeNames = guestNames[item.id] || [];
@@ -555,20 +612,10 @@ export default function App() {
       return;
     }
 
-    // Map packages
-    const pkg1: PackageTier = {
-      name: adminEventForm.package1Name || 'The Pavilion Club',
-      price: Number(adminEventForm.package1Price) || 500,
-      benefits: adminEventForm.package1Benefits.split(',').map(b => b.trim()).filter(Boolean),
-      description: 'Standard luxury hospitality with prime seat allotments and catered food/bars.',
-    };
-    
-    const pkg2: PackageTier = {
-      name: adminEventForm.package2Name || 'The President’s Suite',
-      price: Number(adminEventForm.package2Price) || 1500,
-      benefits: adminEventForm.package2Benefits.split(',').map(b => b.trim()).filter(Boolean),
-      description: 'Ultra-exclusive private suite access with bespoke dining, personal butler, and custom transfers.',
-    };
+    if (adminEventPackages.length === 0) {
+      alert('An event must have at least one Package Tier defined.');
+      return;
+    }
 
     const parsedExperience: Experience = {
       id: editingEventId || `event-${Date.now()}-${adminEventForm.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
@@ -582,7 +629,8 @@ export default function App() {
       shortDescription: adminEventForm.shortDescription || 'Experience unmatched VIP hospitality access under sovereign guidelines.',
       description: adminEventForm.description || 'Step into the supreme luxury arena where high adrenaline sport meets three-star gastronomy. Secure official debentures and Loge box seating allotments.',
       highlightBenefit: adminEventForm.highlightBenefit || 'Premium category seating combined with Michelin-Starred menus.',
-      packages: [pkg1, pkg2],
+      packages: adminEventPackages,
+      upgrades: adminEventUpgrades,
     };
 
     setExperiencesList(prev => {
@@ -625,6 +673,8 @@ export default function App() {
       package2Price: exp.packages[1]?.price || 2200,
       package2Benefits: exp.packages[1]?.benefits.join(', ') || '',
     });
+    setAdminEventPackages(exp.packages || []);
+    setAdminEventUpgrades(exp.upgrades || []);
   };
 
   // Reset Event Form
@@ -648,6 +698,92 @@ export default function App() {
       package2Price: 2200,
       package2Benefits: 'Front-row Box Seating, Five-course private menu, Dedicated butler, Chauffeur transfers',
     });
+    setAdminEventPackages([
+      {
+        name: 'The Pavilion Club',
+        price: 750,
+        benefits: ['Premium padded seating', 'Gourmet buffet', 'Fine wines & champagne'],
+        description: 'Standard luxury hospitality with prime seat allotments and catered food/bars.'
+      },
+      {
+        name: 'The President’s Suite',
+        price: 2200,
+        benefits: ['Front-row Box Seating', 'Five-course private menu', 'Dedicated butler', 'Chauffeur transfers'],
+        description: 'Ultra-exclusive private suite access with bespoke dining, personal butler, and custom transfers.'
+      }
+    ]);
+    setAdminEventUpgrades([]);
+  };
+
+  // Upgrades management handlers
+  const handleSaveUpgrade = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminUpgradeForm.name.trim() || !adminUpgradeForm.description.trim() || adminUpgradeForm.cost === null || adminUpgradeForm.cost === undefined || isNaN(adminUpgradeForm.cost)) {
+      alert('Please fill in all upgrade fields with valid values.');
+      return;
+    }
+
+    const trimmedName = adminUpgradeForm.name.trim();
+    const upgradeId = editingUpgradeId || `upg-${Date.now()}-${trimmedName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+
+    const parsedUpgrade = {
+      id: upgradeId,
+      name: trimmedName,
+      description: adminUpgradeForm.description.trim(),
+      cost: Number(adminUpgradeForm.cost),
+      icon: adminUpgradeForm.icon || 'Coffee',
+    };
+
+    setGlobalUpgrades(prev => {
+      if (editingUpgradeId) {
+        return prev.map(u => u.id === editingUpgradeId ? parsedUpgrade : u);
+      } else {
+        return [...prev, parsedUpgrade];
+      }
+    });
+
+    alert(editingUpgradeId ? 'Premium upgrade updated successfully!' : 'New premium upgrade added to the portal!');
+    handleResetUpgradeForm();
+  };
+
+  const handleResetUpgradeForm = () => {
+    setEditingUpgradeId(null);
+    setAdminUpgradeForm({
+      id: '',
+      name: '',
+      description: '',
+      cost: 100,
+      icon: 'Coffee',
+    });
+  };
+
+  const handleDeleteUpgrade = (id: string) => {
+    if (confirm('Are you sure you want to remove this premium upgrade? This will affect new custom quotes immediately.')) {
+      setGlobalUpgrades(prev => prev.filter(u => u.id !== id));
+      // Clean up from the active form's selections
+      setAdminEventUpgrades(prev => prev.filter(upgId => upgId !== id));
+      // Clean up from all experiences
+      setExperiencesList(prev => prev.map(exp => {
+        if (exp.upgrades) {
+          return {
+            ...exp,
+            upgrades: exp.upgrades.filter(upgId => upgId !== id)
+          };
+        }
+        return exp;
+      }));
+    }
+  };
+
+  const handleEditUpgradeStart = (upg: any) => {
+    setEditingUpgradeId(upg.id);
+    setAdminUpgradeForm({
+      id: upg.id,
+      name: upg.name,
+      description: upg.description,
+      cost: upg.cost,
+      icon: upg.icon,
+    });
   };
 
   // Submit direct basket inquiry
@@ -665,11 +801,14 @@ export default function App() {
       status: 'Awaiting Agent' as const,
       items: basket.map(item => {
         const activeUpgrades: string[] = [];
-        if (item.upgrades.chauffeur) activeUpgrades.push('Private Chauffeur');
-        if (item.upgrades.helicopter) activeUpgrades.push('Helicopter Transfer');
-        if (item.upgrades.michelinDining) activeUpgrades.push('Michelin Dining');
-        if (item.upgrades.security) activeUpgrades.push('Personal Concierge');
-        if (item.upgrades.branding) activeUpgrades.push('Suite VIP Branding');
+        Object.keys(item.upgrades).forEach(key => {
+          if (item.upgrades[key]) {
+            const matchingUpg = globalUpgrades.find(u => u.id === key);
+            if (matchingUpg) {
+              activeUpgrades.push(matchingUpg.name);
+            }
+          }
+        });
 
         return {
           experienceTitle: item.experienceTitle,
@@ -705,10 +844,15 @@ export default function App() {
     // Calc custom total based on sliders
     let perGuestPrice = recommendedTier.price;
     const activeUpgrades: string[] = [];
-    if (vipUpgrades.chauffeur) { perGuestPrice += 250; activeUpgrades.push('Private Chauffeur'); }
-    if (vipUpgrades.helicopter) { perGuestPrice += 850; activeUpgrades.push('Helicopter Transfer'); }
-    if (vipUpgrades.concierge) { perGuestPrice += 300; activeUpgrades.push('Personal Concierge'); }
-    if (vipUpgrades.branding) { perGuestPrice += 150; activeUpgrades.push('Suite VIP Branding'); }
+    Object.keys(vipUpgrades).forEach((key) => {
+      if (vipUpgrades[key]) {
+        const matchingUpg = globalUpgrades.find(u => u.id === key);
+        if (matchingUpg) {
+          perGuestPrice += matchingUpg.cost;
+          activeUpgrades.push(matchingUpg.name);
+        }
+      }
+    });
 
     const newRequest = {
       requestId: `ELV-2026-${Math.floor(100 + Math.random() * 900)}`,
@@ -1473,80 +1617,37 @@ export default function App() {
                         <label className="text-xs uppercase tracking-wider font-semibold text-brand-green block">3. Premium Additions & Upgrades</label>
                         
                         <div className="space-y-2">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleUpgrade('chauffeur')}
-                            className={`w-full flex items-center justify-between p-2.5 rounded border text-left transition ${upgrades.chauffeur ? 'bg-brand-green/5 border-brand-gold' : 'bg-transparent border-brand-green/10 hover:bg-brand-sand-dark'}`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <Car className="w-4 h-4 text-brand-clay shrink-0" />
-                              <div>
-                                <span className="text-xs font-semibold text-brand-green block">Private Chauffeur Service</span>
-                                <span className="text-[10px] text-brand-green/60">Mercedes S-Class luxury airport/venue transfers</span>
-                              </div>
-                            </div>
-                            <span className="font-mono text-xs font-bold text-brand-green/80 shrink-0">+£250</span>
-                          </button>
+                          {globalUpgrades.filter((upg) => {
+                            // If event does not specify any specific upgrades, default to all upgrades
+                            if (!exp.upgrades || exp.upgrades.length === 0) return true;
+                            return exp.upgrades.includes(upg.id);
+                          }).map((upg) => {
+                            const isSelected = !!upgrades[upg.id];
+                            const IconComponent = upg.icon === 'Car' ? Car 
+                              : upg.icon === 'Plane' ? Plane 
+                              : upg.icon === 'Wine' ? Wine 
+                              : upg.icon === 'ShieldCheck' ? ShieldCheck 
+                              : upg.icon === 'Briefcase' ? Briefcase 
+                              : Coffee;
 
-                          <button
-                            type="button"
-                            onClick={() => handleToggleUpgrade('helicopter')}
-                            className={`w-full flex items-center justify-between p-2.5 rounded border text-left transition ${upgrades.helicopter ? 'bg-brand-green/5 border-brand-gold' : 'bg-transparent border-brand-green/10 hover:bg-brand-sand-dark'}`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <Plane className="w-4 h-4 text-brand-clay shrink-0" />
-                              <div>
-                                <span className="text-xs font-semibold text-brand-green block">Helicopter Transit</span>
-                                <span className="text-[10px] text-brand-green/60">Direct heli-port dropoff (Monaco/Paris/London)</span>
-                              </div>
-                            </div>
-                            <span className="font-mono text-xs font-bold text-brand-green/80 shrink-0">+£850</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleToggleUpgrade('michelinDining')}
-                            className={`w-full flex items-center justify-between p-2.5 rounded border text-left transition ${upgrades.michelinDining ? 'bg-brand-green/5 border-brand-gold' : 'bg-transparent border-brand-green/10 hover:bg-brand-sand-dark'}`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <Wine className="w-4 h-4 text-brand-clay shrink-0" />
-                              <div>
-                                <span className="text-xs font-semibold text-brand-green block">Pre-Event Michelin Dining</span>
-                                <span className="text-[10px] text-brand-green/60">Exclusive tasting menu with wine pairings</span>
-                              </div>
-                            </div>
-                            <span className="font-mono text-xs font-bold text-brand-green/80 shrink-0">+£400</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleToggleUpgrade('security')}
-                            className={`w-full flex items-center justify-between p-2.5 rounded border text-left transition ${upgrades.security ? 'bg-brand-green/5 border-brand-gold' : 'bg-transparent border-brand-green/10 hover:bg-brand-sand-dark'}`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <ShieldCheck className="w-4 h-4 text-brand-clay shrink-0" />
-                              <div>
-                                <span className="text-xs font-semibold text-brand-green block">Personal VIP Concierge</span>
-                                <span className="text-[10px] text-brand-green/60">On-site host, hostesses, and personal security</span>
-                              </div>
-                            </div>
-                            <span className="font-mono text-xs font-bold text-brand-green/80 shrink-0">+£300</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleToggleUpgrade('branding')}
-                            className={`w-full flex items-center justify-between p-2.5 rounded border text-left transition ${upgrades.branding ? 'bg-brand-green/5 border-brand-gold' : 'bg-transparent border-brand-green/10 hover:bg-brand-sand-dark'}`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <Briefcase className="w-4 h-4 text-brand-clay shrink-0" />
-                              <div>
-                                <span className="text-xs font-semibold text-brand-green block">Suite VIP Branding</span>
-                                <span className="text-[10px] text-brand-green/60">Custom VIP signage, logos, and color palettes</span>
-                              </div>
-                            </div>
-                            <span className="font-mono text-xs font-bold text-brand-green/80 shrink-0">+£150</span>
-                          </button>
+                            return (
+                              <button
+                                key={upg.id}
+                                type="button"
+                                onClick={() => handleToggleUpgrade(upg.id)}
+                                className={`w-full flex items-center justify-between p-2.5 rounded border text-left transition ${isSelected ? 'bg-brand-green/5 border-brand-gold ring-1 ring-brand-gold' : 'bg-transparent border-brand-green/10 hover:bg-brand-sand-dark'}`}
+                              >
+                                <div className="flex items-center gap-2.5">
+                                  <IconComponent className="w-4 h-4 text-brand-clay shrink-0" />
+                                  <div>
+                                    <span className="text-xs font-semibold text-brand-green block">{upg.name}</span>
+                                    <span className="text-[10px] text-brand-green/60">{upg.description}</span>
+                                  </div>
+                                </div>
+                                <span className="font-mono text-xs font-bold text-brand-green/80 shrink-0">+£{upg.cost}</span>
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
 
@@ -1561,12 +1662,13 @@ export default function App() {
                           </div>
 
                           {Object.keys(upgrades).map((key) => {
-                            if (upgrades[key as keyof typeof upgrades]) {
-                              const label = key === 'chauffeur' ? 'Private Chauffeur' : key === 'helicopter' ? 'Helicopter' : key === 'michelinDining' ? 'Michelin Dining' : key === 'security' ? 'Personal Concierge' : 'Suite Branding';
+                            if (upgrades[key]) {
+                              const upg = globalUpgrades.find(u => u.id === key);
+                              const label = upg ? upg.name : key;
                               return (
                                 <div key={key} className="flex justify-between pl-3 border-l border-brand-gold/30 text-[11px]">
                                   <span>+ {label}:</span>
-                                  <span className="font-mono">£{getUpgradeCost(key as keyof typeof upgrades)} × {customGuests}</span>
+                                  <span className="font-mono">£{getUpgradeCost(key)} × {customGuests}</span>
                                 </div>
                               );
                             }
@@ -1759,41 +1861,30 @@ export default function App() {
                     <div className="space-y-2.5">
                       <label className="text-xs uppercase tracking-wider font-semibold text-brand-green block">Premium Logistics Requested</label>
                       <div className="grid grid-cols-2 gap-3 text-xs text-brand-green">
-                        <button
-                          type="button"
-                          onClick={() => setCorpUpgrades(prev => ({...prev, chauffeur: !prev.chauffeur}))}
-                          className={`flex items-center gap-2 p-2 rounded border text-left transition ${vipUpgrades.chauffeur ? 'bg-brand-green/5 border-brand-gold font-semibold' : 'bg-transparent border-brand-green/10 hover:bg-brand-sand-dark'}`}
-                        >
-                          <Check className={`w-4 h-4 text-brand-gold shrink-0 ${vipUpgrades.chauffeur ? 'opacity-100' : 'opacity-20'}`} />
-                          <span>Chauffeur Transfers</span>
-                        </button>
+                        {globalUpgrades.map((upg) => {
+                          const isSelected = !!vipUpgrades[upg.id];
+                          const IconComponent = upg.icon === 'Car' ? Car 
+                            : upg.icon === 'Plane' ? Plane 
+                            : upg.icon === 'Wine' ? Wine 
+                            : upg.icon === 'ShieldCheck' ? ShieldCheck 
+                            : upg.icon === 'Briefcase' ? Briefcase 
+                            : Coffee;
 
-                        <button
-                          type="button"
-                          onClick={() => setCorpUpgrades(prev => ({...prev, helicopter: !prev.helicopter}))}
-                          className={`flex items-center gap-2 p-2 rounded border text-left transition ${vipUpgrades.helicopter ? 'bg-brand-green/5 border-brand-gold font-semibold' : 'bg-transparent border-brand-green/10 hover:bg-brand-sand-dark'}`}
-                        >
-                          <Check className={`w-4 h-4 text-brand-gold shrink-0 ${vipUpgrades.helicopter ? 'opacity-100' : 'opacity-20'}`} />
-                          <span>Heli-Port Drops</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setCorpUpgrades(prev => ({...prev, concierge: !prev.concierge}))}
-                          className={`flex items-center gap-2 p-2 rounded border text-left transition ${vipUpgrades.concierge ? 'bg-brand-green/5 border-brand-gold font-semibold' : 'bg-transparent border-brand-green/10 hover:bg-brand-sand-dark'}`}
-                        >
-                          <Check className={`w-4 h-4 text-brand-gold shrink-0 ${vipUpgrades.concierge ? 'opacity-100' : 'opacity-20'}`} />
-                          <span>On-Site VIP Concierge</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setCorpUpgrades(prev => ({...prev, branding: !prev.branding}))}
-                          className={`flex items-center gap-2 p-2 rounded border text-left transition ${vipUpgrades.branding ? 'bg-brand-green/5 border-brand-gold font-semibold' : 'bg-transparent border-brand-green/10 hover:bg-brand-sand-dark'}`}
-                        >
-                          <Check className={`w-4 h-4 text-brand-gold shrink-0 ${vipUpgrades.branding ? 'opacity-100' : 'opacity-20'}`} />
-                          <span>Custom VIP Branding</span>
-                        </button>
+                          return (
+                            <button
+                              key={upg.id}
+                              type="button"
+                              onClick={() => setCorpUpgrades(prev => ({...prev, [upg.id]: !prev[upg.id]}))}
+                              className={`flex items-center gap-2 p-2 rounded border text-left transition ${isSelected ? 'bg-brand-green/5 border-brand-gold font-semibold' : 'bg-transparent border-brand-green/10 hover:bg-brand-sand-dark'}`}
+                            >
+                              <Check className={`w-4 h-4 text-brand-gold shrink-0 ${isSelected ? 'opacity-100' : 'opacity-20'}`} />
+                              <div className="truncate">
+                                <span className="block font-semibold text-xs leading-none">{upg.name}</span>
+                                <span className="text-[9px] text-brand-green/60">+£{upg.cost}/guest</span>
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -2006,9 +2097,15 @@ export default function App() {
                             <p className="text-[11px] text-brand-green/75">{item.experienceLocation} · {item.guests} Guests</p>
                             
                             {/* Upgrades listed */}
-                            {Object.keys(item.upgrades).some(k => item.upgrades[k as keyof typeof upgrades]) && (
+                            {Object.keys(item.upgrades).some(k => item.upgrades[k]) && (
                               <p className="text-[10px] text-brand-green/60 pt-1 font-light italic leading-normal">
-                                Upgrades: {Object.keys(item.upgrades).filter(k => item.upgrades[k as keyof typeof upgrades]).map(k => k === 'chauffeur' ? 'Chauffeur' : k === 'helicopter' ? 'Helicopter' : k === 'michelinDining' ? 'Michelin Dining' : k === 'security' ? 'Concierge' : 'Branding').join(', ')}
+                                Upgrades: {Object.keys(item.upgrades)
+                                  .filter(k => item.upgrades[k])
+                                  .map(k => {
+                                    const matched = globalUpgrades.find(g => g.id === k);
+                                    return matched ? matched.name : k;
+                                  })
+                                  .join(', ')}
                               </p>
                             )}
                           </div>
@@ -2713,7 +2810,7 @@ export default function App() {
                   </p>
                 </div>
                 
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => setAdminSubTab('events')}
                     className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded transition ${adminSubTab === 'events' ? 'bg-brand-green text-brand-sand shadow' : 'bg-brand-sand-dark text-brand-green hover:bg-brand-sand'}`}
@@ -2725,6 +2822,12 @@ export default function App() {
                     className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded transition ${adminSubTab === 'purchases' ? 'bg-brand-green text-brand-sand shadow' : 'bg-brand-sand-dark text-brand-green hover:bg-brand-sand'}`}
                   >
                     Purchase & Quote Tracker
+                  </button>
+                  <button
+                    onClick={() => setAdminSubTab('upgrades')}
+                    className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded transition ${adminSubTab === 'upgrades' ? 'bg-brand-green text-brand-sand shadow' : 'bg-brand-sand-dark text-brand-green hover:bg-brand-sand'}`}
+                  >
+                    Premium Additions & Upgrades
                   </button>
                 </div>
               </div>
@@ -2890,60 +2993,137 @@ export default function App() {
                       />
                     </div>
 
-                    {/* PRICING TIER 1 CONFIG */}
-                    <div className="p-3 bg-brand-sand-dark rounded border border-brand-gold/25 space-y-2">
-                      <span className="text-[9px] uppercase tracking-wider font-bold text-brand-green block">Package Tier 1 Configuration</span>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="text"
-                          placeholder="Tier 1 Name (e.g. Pavilion Club)"
-                          value={adminEventForm.package1Name}
-                          onChange={(e) => setAdminEventForm({ ...adminEventForm, package1Name: e.target.value })}
-                          className="w-full bg-white border border-brand-green/10 rounded px-2.5 py-1.5 text-xs"
-                        />
-                        <input
-                          type="number"
-                          placeholder="Price in GBP (£)"
-                          value={adminEventForm.package1Price}
-                          onChange={(e) => setAdminEventForm({ ...adminEventForm, package1Price: Number(e.target.value) })}
-                          className="w-full bg-white border border-brand-green/10 rounded px-2.5 py-1.5 text-xs font-mono"
-                        />
+                    {/* DYNAMIC PRICING TIERS CONFIG */}
+                    <div className="space-y-3 pt-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Hospitality Package Tiers ({adminEventPackages.length}) *</span>
+                        <button
+                          type="button"
+                          onClick={() => setAdminEventPackages([
+                            ...adminEventPackages,
+                            { name: 'New Luxury Tier', price: 1000, benefits: ['Category 1 seats', 'Gourmet hospitality lounge'], description: 'A bespoke hospitality package with premium inclusion allotments.' }
+                          ])}
+                          className="bg-brand-gold/15 text-brand-gold hover:bg-brand-gold/25 border border-brand-gold/30 text-[9px] uppercase font-bold px-2.5 py-1 rounded-sm transition"
+                        >
+                          + Add Package Tier
+                        </button>
                       </div>
-                      <input
-                        type="text"
-                        placeholder="Benefits (separated by commas)"
-                        value={adminEventForm.package1Benefits}
-                        onChange={(e) => setAdminEventForm({ ...adminEventForm, package1Benefits: e.target.value })}
-                        className="w-full bg-white border border-brand-green/10 rounded px-2.5 py-1.5 text-xs"
-                      />
+
+                      <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                        {adminEventPackages.map((tier, index) => (
+                          <div key={index} className="p-3 bg-brand-sand-dark rounded border border-brand-gold/25 space-y-2 relative">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[9px] uppercase tracking-wider font-bold text-brand-green block">Tier {index + 1} Settings</span>
+                              {adminEventPackages.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setAdminEventPackages(adminEventPackages.filter((_, i) => i !== index))}
+                                  className="text-[9px] uppercase tracking-wider font-bold text-brand-clay hover:text-brand-clay-dark"
+                                >
+                                  Remove Tier
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <span className="text-[8px] text-brand-green/60 uppercase block font-semibold mb-0.5">Tier Name</span>
+                                <input
+                                  type="text"
+                                  required
+                                  placeholder="e.g. Pavilion Club"
+                                  value={tier.name}
+                                  onChange={(e) => {
+                                    const updated = [...adminEventPackages];
+                                    updated[index] = { ...updated[index], name: e.target.value };
+                                    setAdminEventPackages(updated);
+                                  }}
+                                  className="w-full bg-white border border-brand-green/10 rounded px-2.5 py-1 text-xs text-brand-dark"
+                                />
+                              </div>
+                              <div>
+                                <span className="text-[8px] text-brand-green/60 uppercase block font-semibold mb-0.5">Price in GBP (£)</span>
+                                <input
+                                  type="number"
+                                  required
+                                  placeholder="e.g. 750"
+                                  value={tier.price}
+                                  onChange={(e) => {
+                                    const updated = [...adminEventPackages];
+                                    updated[index] = { ...updated[index], price: Number(e.target.value) };
+                                    setAdminEventPackages(updated);
+                                  }}
+                                  className="w-full bg-white border border-brand-green/10 rounded px-2.5 py-1 text-xs font-mono text-brand-dark"
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <span className="text-[8px] text-brand-green/60 uppercase block font-semibold mb-0.5">Short Description</span>
+                              <input
+                                type="text"
+                                required
+                                placeholder="Pinnacle of luxury hospitality..."
+                                value={tier.description}
+                                onChange={(e) => {
+                                    const updated = [...adminEventPackages];
+                                    updated[index] = { ...updated[index], description: e.target.value };
+                                    setAdminEventPackages(updated);
+                                }}
+                                className="w-full bg-white border border-brand-green/10 rounded px-2.5 py-1 text-xs text-brand-dark"
+                              />
+                            </div>
+
+                            <div>
+                              <span className="text-[8px] text-brand-green/60 uppercase block font-semibold mb-0.5">Benefits (comma separated)</span>
+                              <input
+                                type="text"
+                                required
+                                placeholder="Luxury catering, Front-row loge, Helicopter access"
+                                value={tier.benefits.join(', ')}
+                                onChange={(e) => {
+                                    const updated = [...adminEventPackages];
+                                    updated[index] = { ...updated[index], benefits: e.target.value.split(',').map(b => b.trim()).filter(Boolean) };
+                                    setAdminEventPackages(updated);
+                                }}
+                                className="w-full bg-white border border-brand-green/10 rounded px-2.5 py-1 text-xs text-brand-dark"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
-                    {/* PRICING TIER 2 CONFIG */}
-                    <div className="p-3 bg-brand-sand-dark rounded border border-brand-gold/25 space-y-2">
-                      <span className="text-[9px] uppercase tracking-wider font-bold text-brand-green block">Package Tier 2 Configuration</span>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="text"
-                          placeholder="Tier 2 Name (e.g. President Suite)"
-                          value={adminEventForm.package2Name}
-                          onChange={(e) => setAdminEventForm({ ...adminEventForm, package2Name: e.target.value })}
-                          className="w-full bg-white border border-brand-green/10 rounded px-2.5 py-1.5 text-xs"
-                        />
-                        <input
-                          type="number"
-                          placeholder="Price in GBP (£)"
-                          value={adminEventForm.package2Price}
-                          onChange={(e) => setAdminEventForm({ ...adminEventForm, package2Price: Number(e.target.value) })}
-                          className="w-full bg-white border border-brand-green/10 rounded px-2.5 py-1.5 text-xs font-mono"
-                        />
+                    {/* DYNAMIC PREMIUM UPGRADES SELECTOR */}
+                    <div className="space-y-2 pt-2 border-t border-brand-green/10">
+                      <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Available Premium Additions & Upgrades</span>
+                      <p className="text-[9px] text-brand-green/50 mb-2">Select which premium additions are offered for this specific event. If none are checked, all premium additions are active by default.</p>
+                      
+                      <div className="grid grid-cols-1 gap-2 bg-brand-sand-dark p-3 rounded border border-brand-green/15 max-h-48 overflow-y-auto">
+                        {globalUpgrades.map((upg) => {
+                          const isChecked = adminEventUpgrades.includes(upg.id);
+                          return (
+                            <label key={upg.id} className="flex items-center gap-2 text-[11px] font-medium text-brand-green cursor-pointer p-1.5 rounded hover:bg-brand-sand-dark/50 transition">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => {
+                                  if (isChecked) {
+                                    setAdminEventUpgrades(adminEventUpgrades.filter(id => id !== upg.id));
+                                  } else {
+                                    setAdminEventUpgrades([...adminEventUpgrades, upg.id]);
+                                  }
+                                }}
+                                className="rounded border-brand-green/20 text-brand-clay focus:ring-brand-gold w-3.5 h-3.5"
+                              />
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-xs">{upg.name}</span>
+                                <span className="text-[9px] text-brand-green/60">£{upg.cost} / guest</span>
+                              </div>
+                            </label>
+                          );
+                        })}
                       </div>
-                      <input
-                        type="text"
-                        placeholder="Benefits (separated by commas)"
-                        value={adminEventForm.package2Benefits}
-                        onChange={(e) => setAdminEventForm({ ...adminEventForm, package2Benefits: e.target.value })}
-                        className="w-full bg-white border border-brand-green/10 rounded px-2.5 py-1.5 text-xs"
-                      />
                     </div>
 
                     <div className="flex gap-2.5 pt-1">
@@ -3008,6 +3188,148 @@ export default function App() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* TAB 3: PREMIUM ADDITIONS & UPGRADES CONFIGURATOR */}
+            {adminSubTab === 'upgrades' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                
+                {/* CONFIGURATOR FORM (5 cols) */}
+                <div className="lg:col-span-5 bg-white p-6 rounded-lg border border-brand-green/15 shadow-md space-y-4">
+                  <div>
+                    <h3 className="font-serif text-lg font-bold">
+                      {editingUpgradeId ? 'Modify Premium Upgrade' : 'Create Custom VIP Upgrade'}
+                    </h3>
+                    <p className="text-[11px] text-brand-green/60">
+                      Configure dynamic customer inclusions and real-time live cost additions
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleSaveUpgrade} className="space-y-4">
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Upgrade / Addition Name *</span>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. VIP Helicopter Transfer, Private Box Champagne Host"
+                        value={adminUpgradeForm.name}
+                        onChange={(e) => setAdminUpgradeForm({ ...adminUpgradeForm, name: e.target.value })}
+                        className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Cost per Guest (£) *</span>
+                        <input
+                          type="number"
+                          required
+                          min="0"
+                          placeholder="e.g. 250"
+                          value={adminUpgradeForm.cost}
+                          onChange={(e) => setAdminUpgradeForm({ ...adminUpgradeForm, cost: Number(e.target.value) })}
+                          className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-dark font-mono"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Inclusion Icon *</span>
+                        <select
+                          value={adminUpgradeForm.icon}
+                          onChange={(e) => setAdminUpgradeForm({ ...adminUpgradeForm, icon: e.target.value as any })}
+                          className="w-full bg-brand-sand-dark border border-brand-green/10 rounded px-2.5 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-brand-gold text-brand-green font-medium"
+                        >
+                          <option value="Car">Car (Chauffeur, Transfer)</option>
+                          <option value="Plane">Plane (Helicopter, Flight)</option>
+                          <option value="Wine">Wine (Michelin Food, Drinks)</option>
+                          <option value="ShieldCheck">ShieldCheck (Security, Guard)</option>
+                          <option value="Briefcase">Briefcase (Branding, Corporate)</option>
+                          <option value="Coffee">Coffee (General Lounge, Valet)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-brand-green/70 uppercase block font-semibold">Upgrade Description / Inclusions *</span>
+                      <textarea
+                        rows={3}
+                        required
+                        placeholder="Detail the luxury inclusions provided by this option. E.g. Personal host, meet & greets..."
+                        value={adminUpgradeForm.description}
+                        onChange={(e) => setAdminUpgradeForm({ ...adminUpgradeForm, description: e.target.value })}
+                        className="w-full bg-brand-sand-dark border border-brand-green/10 rounded p-2 text-xs focus:outline-none resize-none text-brand-dark"
+                      />
+                    </div>
+
+                    <div className="flex gap-2.5 pt-1">
+                      {editingUpgradeId && (
+                        <button
+                          type="button"
+                          onClick={handleResetUpgradeForm}
+                          className="w-1/3 border border-brand-green/15 text-brand-green text-xs font-bold uppercase py-3 rounded-sm hover:bg-brand-sand transition"
+                        >
+                          Clear
+                        </button>
+                      )}
+                      <button
+                        type="submit"
+                        className="w-full bg-brand-gold text-brand-green hover:bg-brand-gold-light font-bold text-xs uppercase tracking-widest py-3 rounded-sm shadow transition duration-200"
+                      >
+                        {editingUpgradeId ? 'Update Upgrade Item' : 'Publish & Enable Upgrade'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* CURRENT UPGRADES LIST (7 cols) */}
+                <div className="lg:col-span-7 bg-white rounded-lg border border-brand-green/10 shadow-md overflow-hidden animate-fadeIn">
+                  <div className="bg-brand-sand-dark p-4 border-b border-brand-green/10 flex justify-between items-center">
+                    <span className="text-xs uppercase tracking-widest font-bold">Active Premium Upgrades & Additions ({globalUpgrades.length})</span>
+                    <span className="text-[10px] text-brand-green/60 uppercase">Injects customizers in real-time</span>
+                  </div>
+
+                  <div className="divide-y divide-brand-green/10 max-h-[750px] overflow-y-auto">
+                    {globalUpgrades.map((upg) => {
+                      const IconComponent = upg.icon === 'Car' ? Car 
+                        : upg.icon === 'Plane' ? Plane 
+                        : upg.icon === 'Wine' ? Wine 
+                        : upg.icon === 'ShieldCheck' ? ShieldCheck 
+                        : upg.icon === 'Briefcase' ? Briefcase 
+                        : Coffee;
+
+                      return (
+                        <div key={upg.id} className="p-4 flex justify-between items-center gap-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-brand-sand flex items-center justify-center border border-brand-green/10 text-brand-clay shrink-0">
+                              <IconComponent className="w-5 h-5 text-brand-clay" />
+                            </div>
+                            <div className="space-y-0.5">
+                              <h4 className="font-serif text-sm font-bold text-brand-green">{upg.name}</h4>
+                              <p className="text-[11px] text-brand-green/60">{upg.description}</p>
+                              <span className="font-mono text-xs text-brand-clay font-bold block mt-1">£{upg.cost} / guest</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={() => handleEditUpgradeStart(upg)}
+                              className="bg-brand-sand hover:bg-brand-gold-light/20 text-brand-green border border-brand-green/10 rounded px-3 py-1.5 text-xs font-bold transition"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUpgrade(upg.id)}
+                              className="bg-red-50 hover:bg-red-100 text-brand-clay border border-brand-clay/10 rounded px-3 py-1.5 text-xs font-bold transition"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 

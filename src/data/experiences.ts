@@ -19,6 +19,7 @@ export interface Experience {
   highlightBenefit: string;
   tagline: string;
   packages: PackageTier[];
+  upgrades?: string[];
 }
 
 export const EXPERIENCES: Experience[] = [
