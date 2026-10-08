@@ -62,7 +62,17 @@ export default function App() {
 
   const [experiencesList, setExperiencesList] = useState<Experience[]>(() => {
     const saved = localStorage.getItem('elevate_experiences_list');
-    return saved ? JSON.parse(saved) : EXPERIENCES;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as Experience[];
+        const hasCoachella = parsed.some(exp => exp.id === 'coachella-safari');
+        if (hasCoachella) return parsed;
+      } catch (e) {
+        console.error(e);
+      }
+      localStorage.removeItem('elevate_experiences_list');
+    }
+    return EXPERIENCES;
   });
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -142,7 +152,7 @@ export default function App() {
   // Helper to map experience category to main category
   const mapCategoryToMain = (cat: string): 'Sports' | 'Music' | 'Other' => {
     const sports = ['Tennis', 'Motorsport', 'Football', 'Golf', 'Rugby', 'Basketball', 'Cricket'];
-    const music = ['Music'];
+    const music = ['Music', 'Festival', 'Live Band'];
     if (sports.includes(cat)) return 'Sports';
     if (music.includes(cat)) return 'Music';
     return 'Other';
@@ -150,7 +160,7 @@ export default function App() {
 
   const preferredSubCategoryOrder = [
     'Tennis', 'Motorsport', 'Football', 'Golf', 'Rugby', 'Basketball', 'Cricket', 
-    'Music', 'Heritage'
+    'Music', 'Festival', 'Live Band', 'Heritage'
   ];
 
   // Dynamically compute subcategories under the selected main category
@@ -2788,10 +2798,13 @@ export default function App() {
                           <option value="Motorsport">Motorsport</option>
                           <option value="Football">Football</option>
                           <option value="Music">Music</option>
+                          <option value="Festival">Festival (Music)</option>
+                          <option value="Live Band">Live Band (Music)</option>
                           <option value="Golf">Golf</option>
                           <option value="Rugby">Rugby</option>
                           <option value="Basketball">Basketball</option>
                           <option value="Cricket">Cricket</option>
+                          <option value="Heritage">Heritage</option>
                         </select>
                       </div>
                       <div className="space-y-1">

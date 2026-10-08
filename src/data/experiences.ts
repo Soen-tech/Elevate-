@@ -9,7 +9,7 @@ export interface PackageTier {
 export interface Experience {
   id: string;
   title: string;
-  category: 'Tennis' | 'Motorsport' | 'Football' | 'Music' | 'Golf' | 'Heritage' | 'Rugby' | 'Basketball' | 'Cricket';
+  category: 'Tennis' | 'Motorsport' | 'Football' | 'Music' | 'Golf' | 'Heritage' | 'Rugby' | 'Basketball' | 'Cricket' | 'Festival' | 'Live Band';
   location: string;
   venue: string;
   dates: string;
@@ -131,7 +131,7 @@ export const EXPERIENCES: Experience[] = [
   {
     id: 'wembley-concerts',
     title: 'Wembley VIP Concert Suites',
-    category: 'Music',
+    category: 'Live Band',
     location: 'London, United Kingdom',
     venue: 'Wembley Stadium',
     dates: 'Varying Dates - Summer 2026',
@@ -339,6 +339,46 @@ export const EXPERIENCES: Experience[] = [
           'Exclusive access to private air-conditioned club lounge and outdoor balcony views'
         ],
         description: 'An elite lounge experience tailored for ultimate comfort and strategic views. Mingle with cricket royalty and enjoy supreme luxury.'
+      }
+    ]
+  },
+  {
+    id: 'coachella-safari',
+    title: 'Coachella VIP Safari Oasis',
+    category: 'Festival',
+    location: 'Indio, California',
+    venue: 'Empire Polo Club',
+    dates: 'April 17 – April 26, 2026',
+    image: '/assets/images/luxury_festival_vip_1791451836621.jpg',
+    tagline: 'Sovereign Oasis in the Desert Sands',
+    shortDescription: 'Savor ultimate bohemian luxury with premium air-conditioned Safari Tents, private golf carts, and elite artist passes.',
+    description: 'Step into an exclusive enclave of ultimate comfort at the world’s most celebrated music festival. The Coachella VIP Safari Oasis combines the high-octane energy of top-tier live performances with five-star hospitality. Enjoy air-conditioned luxury tents, dedicated golf-cart shuttles that whisk you directly to any stage, and guest passes that grant you access to exclusive artist-only viewing areas.',
+    highlightBenefit: 'Air-conditioned boutique Safari Tent, 24/7 dedicated golf cart chauffeur, and all-access Artist-Guest passes.',
+    packages: [
+      {
+        name: 'Safari Luxury Tent',
+        price: 2450,
+        benefits: [
+          'All-access Artist Guest wristband for the entire weekend',
+          'Fully furnished air-conditioned boutique safari tent',
+          '24/7 golf-cart shuttle service to any stage or backstage area',
+          'Access to private Safari Lounge with complimentary gourmet dining & bars',
+          'Dedicated VIP concierge, private premium restrooms & showers'
+        ],
+        description: 'A beautiful oasis in the desert. Perfect for high-profile music lovers who desire the ultimate festival comfort and unparalleled stage access.'
+      },
+      {
+        name: 'Oasis Executive Suite',
+        price: 4850,
+        badge: 'Ultra-Exclusive',
+        benefits: [
+          'Premium front-row stage-side private viewing platforms',
+          'Private ultra-luxe safari yurt with en-suite restroom & shower',
+          'Bespoke daily fine dining menus and private cocktail mixologist',
+          'Exclusive artist lounge invitations and backstage tours',
+          'Airport helicopter transfer to and from Palm Springs airport'
+        ],
+        description: 'The pinnacle of festival luxury. A private suite experience combining bohemian style with sovereign five-star hotel service.'
       }
     ]
   }
