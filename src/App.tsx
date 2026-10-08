@@ -136,7 +136,41 @@ export default function App() {
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<'All' | 'Tennis' | 'Motorsport' | 'Football' | 'Music' | 'Golf' | 'Heritage' | 'Rugby' | 'Basketball' | 'Cricket'>('All');
+  const [selectedMainCategory, setSelectedMainCategory] = useState<'All' | 'Sports' | 'Music' | 'Other'>('All');
+  const [selectedSubCategory, setSelectedSubCategory] = useState<string>('All');
+
+  // Helper to map experience category to main category
+  const mapCategoryToMain = (cat: string): 'Sports' | 'Music' | 'Other' => {
+    const sports = ['Tennis', 'Motorsport', 'Football', 'Golf', 'Rugby', 'Basketball', 'Cricket'];
+    const music = ['Music'];
+    if (sports.includes(cat)) return 'Sports';
+    if (music.includes(cat)) return 'Music';
+    return 'Other';
+  };
+
+  const preferredSubCategoryOrder = [
+    'Tennis', 'Motorsport', 'Football', 'Golf', 'Rugby', 'Basketball', 'Cricket', 
+    'Music', 'Heritage'
+  ];
+
+  // Dynamically compute subcategories under the selected main category
+  const availableSubCategories = React.useMemo(() => {
+    const list = experiencesList.map(exp => exp.category);
+    const unique = Array.from(new Set(list));
+    
+    const filtered = selectedMainCategory === 'All' 
+      ? unique 
+      : unique.filter(cat => mapCategoryToMain(cat) === selectedMainCategory);
+      
+    return filtered.sort((a, b) => {
+      const idxA = preferredSubCategoryOrder.indexOf(a);
+      const idxB = preferredSubCategoryOrder.indexOf(b);
+      if (idxA === -1 && idxB === -1) return a.localeCompare(b);
+      if (idxA === -1) return 1;
+      if (idxB === -1) return -1;
+      return idxA - idxB;
+    });
+  }, [experiencesList, selectedMainCategory]);
 
   // Selected experience for detailed customizer view
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -271,6 +305,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('elevate_completed_bookings', JSON.stringify(completedBookings));
   }, [completedBookings]);
+
+  useEffect(() => {
+    localStorage.setItem('elevate_experiences_list', JSON.stringify(experiencesList));
+  }, [experiencesList]);
 
   // Seed default registered users for instant testing
   useEffect(() => {
@@ -689,14 +727,22 @@ export default function App() {
     // Auto shift view after brief delay or keep showing success screen
   };
 
-  // Custom filtering algorithm for home events
+  // Custom filtering algorithm for home events with main and sub categories
   const filteredExperiences = experiencesList.filter((exp) => {
-    const matchesCategory = selectedCategory === 'All' || exp.category === selectedCategory;
+    // 1. Filter by Main Category
+    const mainCat = mapCategoryToMain(exp.category);
+    const matchesMain = selectedMainCategory === 'All' || mainCat === selectedMainCategory;
+    
+    // 2. Filter by Sub Category
+    const matchesSub = selectedSubCategory === 'All' || exp.category === selectedSubCategory;
+    
+    // 3. Filter by Search Query
     const matchesSearch = exp.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           exp.location.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           exp.venue.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           exp.shortDescription.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+                          
+    return matchesMain && matchesSub && matchesSearch;
   });
 
   // Calculate statistics for proof adjacency
@@ -1038,16 +1084,70 @@ export default function App() {
                   <p className="text-xs text-brand-green/60 uppercase tracking-widest mt-0.5">Filter exclusive reservations by tournament or event type</p>
                 </div>
 
-                <div className="flex flex-wrap gap-1.5 p-1 bg-brand-sand-dark rounded-md border border-brand-green/5">
-                  {(['All', 'Tennis', 'Motorsport', 'Football', 'Music', 'Golf', 'Rugby', 'Basketball', 'Cricket'] as const).map((cat) => (
-                    <button
-                      key={cat}
-                      onClick={() => setSelectedCategory(cat)}
-                      className={`px-3 py-1.5 text-xs font-semibold tracking-wider uppercase rounded transition ${selectedCategory === cat ? 'bg-brand-green text-brand-sand shadow-sm' : 'text-brand-green/70 hover:text-brand-green hover:bg-brand-sand-dark'}`}
-                    >
-                      {cat}
-                    </button>
-                  ))}
+                <div className="flex flex-col gap-3 w-full md:w-auto">
+                  {/* Main Categories Segmented Control */}
+                  <div className="flex flex-wrap gap-1 p-1 bg-brand-sand-dark rounded-md border border-brand-green/5 self-end">
+                    {(['All', 'Sports', 'Music', 'Other'] as const).map((mainCat) => {
+                      const labelMap = {
+                        All: 'All',
+                        Sports: 'Sports',
+                        Music: 'Music',
+                        Other: 'Other'
+                      };
+                      const isActive = selectedMainCategory === mainCat;
+                      return (
+                        <button
+                          key={mainCat}
+                          type="button"
+                          onClick={() => {
+                            setSelectedMainCategory(mainCat);
+                            setSelectedSubCategory('All');
+                          }}
+                          className={`px-3 py-1.5 text-xs font-bold tracking-wider uppercase rounded transition-all duration-200 ${
+                            isActive 
+                              ? 'bg-brand-green text-brand-sand shadow-sm font-bold' 
+                              : 'text-brand-green/70 hover:text-brand-green hover:bg-brand-sand-dark/50'
+                          }`}
+                        >
+                          {labelMap[mainCat]}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Sub-categories segment */}
+                  {availableSubCategories.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSubCategory('All')}
+                        className={`px-2.5 py-1 text-[10px] font-semibold tracking-wider uppercase rounded-sm border transition-all ${
+                          selectedSubCategory === 'All'
+                            ? 'bg-brand-gold/15 text-brand-gold border-brand-gold/30'
+                            : 'bg-transparent text-brand-green/60 border-transparent hover:text-brand-green hover:bg-brand-sand-dark'
+                        }`}
+                      >
+                        All {selectedMainCategory === 'All' ? 'Types' : selectedMainCategory}
+                      </button>
+                      {availableSubCategories.map((subCat) => {
+                        const isActive = selectedSubCategory === subCat;
+                        return (
+                          <button
+                            key={subCat}
+                            type="button"
+                            onClick={() => setSelectedSubCategory(subCat)}
+                            className={`px-2.5 py-1 text-[10px] font-semibold tracking-wider uppercase rounded-sm border transition-all ${
+                              isActive
+                                ? 'bg-brand-gold/15 text-brand-gold border-brand-gold/30'
+                                : 'bg-transparent text-brand-green/60 border-transparent hover:text-brand-green hover:bg-brand-sand-dark'
+                            }`}
+                          >
+                            {subCat}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1144,7 +1244,7 @@ export default function App() {
                   <div className="col-span-2 text-center py-16 bg-white rounded-lg border border-brand-green/10">
                     <p className="text-lg font-serif text-brand-green">No experiences match your luxury search filters.</p>
                     <button 
-                      onClick={() => { setSearchQuery(''); setSelectedCategory('All'); }}
+                      onClick={() => { setSearchQuery(''); setSelectedMainCategory('All'); setSelectedSubCategory('All'); }}
                       className="mt-4 bg-brand-green hover:bg-brand-green-light text-brand-sand px-4 py-2 rounded text-xs font-bold uppercase tracking-wider transition"
                     >
                       Reset Catalog Search
