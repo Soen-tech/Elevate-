@@ -9,7 +9,7 @@ export interface PackageTier {
 export interface Experience {
   id: string;
   title: string;
-  category: 'Tennis' | 'Motorsport' | 'Football' | 'Music' | 'Golf' | 'Heritage' | 'Rugby' | 'Basketball';
+  category: 'Tennis' | 'Motorsport' | 'Football' | 'Music' | 'Golf' | 'Heritage' | 'Rugby' | 'Basketball' | 'Cricket';
   location: string;
   venue: string;
   dates: string;
@@ -299,6 +299,46 @@ export const EXPERIENCES: Experience[] = [
           'Two passes to the official closed-door NBA Paris Afterparty'
         ],
         description: 'For those seeking the ultimate entertainment canvas. A private suite experience combining the NBA glamour with French hospitality.'
+      }
+    ]
+  },
+  {
+    id: 'lords-test',
+    title: 'Lord’s Cricket Test Match',
+    category: 'Cricket',
+    location: 'London, United Kingdom',
+    venue: 'Lord’s Cricket Ground',
+    dates: 'July 16 – July 20, 2026',
+    image: '/assets/images/cricket_event_1791447527593.jpg',
+    tagline: 'The Home of Cricket, The Epitome of Tradition',
+    shortDescription: 'Witness the prestigious Lord’s Test Match from the historic Pavilion or exclusive modern hospitality suites.',
+    description: 'Steeped in history and tradition, a Test Match at Lord’s is the ultimate summer social highlight. Experience the unique ambiance of the Home of Cricket. Watch world-class batting and bowling with premium seats adjacent to the historic Grade II* listed Pavilion. Indulge in traditional Pimm’s receptions, gourmet lunch buffets, and luxury afternoon tea.',
+    highlightBenefit: 'Premium seating in the Grand Stand or Mound Stand, with all-day premium dining, afternoon tea, and complimentary vintage wines.',
+    packages: [
+      {
+        name: 'The Harris Garden',
+        price: 795,
+        benefits: [
+          'Guaranteed premium ticket in the Grand Stand or Warner Stand',
+          'Al fresco garden reception with unlimited Pimm’s, champagne & cocktails',
+          'Sumptuous three-course hot buffet lunch featuring British summer classics',
+          'Traditional Lord’s Afternoon Tea with freshly baked scones & cream',
+          'Official souvenir match programme and cricket commentary radio earpiece'
+        ],
+        description: 'A beautiful, light-filled garden setting ideal for networking under the summer sun, combining elite match views with relaxed hospitality.'
+      },
+      {
+        name: 'The Captains’ Lounge',
+        price: 1550,
+        badge: 'Premier Club',
+        benefits: [
+          'Exquisite seating in the Mound Stand, directly behind the bowler’s arm',
+          'Four-course seated dining experience with premium wine pairing curated by award-winning chefs',
+          'Q&A session and meet-and-greet with legendary former international cricket captains',
+          'All-day flowing Bollinger Champagne, fine spirits, and craft beers',
+          'Exclusive access to private air-conditioned club lounge and outdoor balcony views'
+        ],
+        description: 'An elite lounge experience tailored for ultimate comfort and strategic views. Mingle with cricket royalty and enjoy supreme luxury.'
       }
     ]
   }

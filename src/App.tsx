@@ -136,7 +136,7 @@ export default function App() {
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<'All' | 'Tennis' | 'Motorsport' | 'Football' | 'Music' | 'Golf' | 'Heritage' | 'Rugby' | 'Basketball'>('All');
+  const [selectedCategory, setSelectedCategory] = useState<'All' | 'Tennis' | 'Motorsport' | 'Football' | 'Music' | 'Golf' | 'Heritage' | 'Rugby' | 'Basketball' | 'Cricket'>('All');
 
   // Selected experience for detailed customizer view
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -225,7 +225,7 @@ export default function App() {
   // VIP Portal Interactive Planner State
   const [vipBudget, setCorpBudget] = useState<number>(1500);
   const [vipGuests, setCorpGuests] = useState<number>(20);
-  const [vipCategory, setCorpCategory] = useState<'Tennis' | 'Motorsport' | 'Music' | 'Golf' | 'Rugby' | 'Basketball' | 'All'>('All');
+  const [vipCategory, setCorpCategory] = useState<'Tennis' | 'Motorsport' | 'Music' | 'Golf' | 'Rugby' | 'Basketball' | 'Cricket' | 'All'>('All');
   const [vipUpgrades, setCorpUpgrades] = useState({
     chauffeur: true,
     helicopter: false,
@@ -1039,7 +1039,7 @@ export default function App() {
                 </div>
 
                 <div className="flex flex-wrap gap-1.5 p-1 bg-brand-sand-dark rounded-md border border-brand-green/5">
-                  {(['All', 'Tennis', 'Motorsport', 'Football', 'Music', 'Golf', 'Rugby', 'Basketball'] as const).map((cat) => (
+                  {(['All', 'Tennis', 'Motorsport', 'Football', 'Music', 'Golf', 'Rugby', 'Basketball', 'Cricket'] as const).map((cat) => (
                     <button
                       key={cat}
                       onClick={() => setSelectedCategory(cat)}
@@ -1641,6 +1641,7 @@ export default function App() {
                         <option value="Golf">Golf Tournaments (The Masters/The Open)</option>
                         <option value="Rugby">Rugby Championships (Six Nations)</option>
                         <option value="Basketball">Basketball Elite Games (NBA Paris)</option>
+                        <option value="Cricket">Cricket Test Matches (Lord’s Test)</option>
                       </select>
                     </div>
 
@@ -2690,6 +2691,7 @@ export default function App() {
                           <option value="Golf">Golf</option>
                           <option value="Rugby">Rugby</option>
                           <option value="Basketball">Basketball</option>
+                          <option value="Cricket">Cricket</option>
                         </select>
                       </div>
                       <div className="space-y-1">
