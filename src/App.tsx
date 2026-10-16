@@ -910,16 +910,27 @@ export default function App() {
       <header className="sticky top-0 z-40 bg-brand-green text-brand-sand border-b border-brand-gold/20 shadow-lg px-4 md:px-8 py-3.5 transition-all duration-300">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           
-          {/* ZONE 1: Brand title, one line wordmark */}
+          {/* ZONE 1: Brand title, logo and slogan in top left corner */}
           <div className="flex items-center gap-3 shrink-0">
             <button 
               onClick={() => { setCurrentTab('home'); setSelectedEventId(null); }}
-              className="text-xl md:text-2xl font-serif tracking-widest text-brand-gold font-bold focus:outline-none flex items-center gap-2"
+              className="group focus:outline-none flex items-center gap-2.5 text-left transition-opacity hover:opacity-95"
             >
-              <div className="w-8 h-8 rounded-full border border-brand-gold flex items-center justify-center font-serif bg-brand-green-light">
-                E
+              <div className="w-9 h-9 md:w-10 md:h-10 rounded-full border border-brand-gold/70 overflow-hidden bg-brand-green-light flex items-center justify-center shrink-0 shadow-sm group-hover:border-brand-gold transition-colors">
+                <img 
+                  src="/assets/images/elevate_logo_1791372533321.jpg" 
+                  alt="Elev8 Logo" 
+                  className="w-full h-full object-cover rounded-full"
+                />
               </div>
-              <span>E L E V A T E</span>
+              <div className="flex flex-col items-start justify-center">
+                <span className="text-xl md:text-2xl font-serif tracking-widest text-brand-gold font-bold leading-none group-hover:text-brand-gold-light transition-colors">
+                  ELEV8
+                </span>
+                <span className="text-[10px] md:text-[11px] font-serif italic text-brand-sand/90 tracking-wide leading-tight mt-1 group-hover:text-brand-sand transition-colors">
+                  Be there. Different
+                </span>
+              </div>
             </button>
           </div>
 
@@ -1126,7 +1137,7 @@ export default function App() {
                   className="w-full flex items-center justify-center gap-2 rounded bg-brand-gold text-brand-green font-bold text-xs uppercase py-2.5 shadow-sm"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Install Elevate App</span>
+                  <span>Install Elev8 App</span>
                 </button>
               )}
               {!isInstalled && !isInstallable && isIOS && (
@@ -1160,12 +1171,13 @@ export default function App() {
                 <div className="absolute inset-0 bg-gradient-to-t from-brand-green via-brand-green/70 to-transparent"></div>
               </div>
 
+
               <div className="relative z-10 max-w-5xl mx-auto px-6 text-center space-y-6 pt-12 pb-16">
                 <p className="text-brand-gold uppercase tracking-[0.3em] text-xs font-semibold md:text-sm">
                   The Pinnacle of VIP Hospitality & Official Access
                 </p>
                 <h1 className="text-4xl md:text-6xl font-serif text-brand-sand tracking-wide leading-none text-wrap-balance font-bold">
-                  ELEVATE EXPERIENCES
+                  ELEV8 EXPERIENCES
                 </h1>
                 <p className="max-w-2xl mx-auto text-brand-sand-dark text-sm md:text-lg leading-relaxed font-light">
                   Handcrafted access to the world’s most prestigious sporting contests and exclusive arenas. Merging court-side and track-side adrenaline with five-star French gastronomic hospitality.
@@ -1417,7 +1429,7 @@ export default function App() {
                     Art de Vivre & Grand Slam Standards
                   </h2>
                   <p className="text-brand-sand-dark text-sm leading-relaxed font-light">
-                    Inspired by the supreme luxury of Paris Roland Garros tennis hospitality, Elevate Experiences crafts curated social and networking spaces for VIP leadership. We do not sell plain general tickets; we author complete multi-sensory experiences from customized catering to legendary player meetings.
+                    Inspired by the supreme luxury of Paris Roland Garros tennis hospitality, Elev8 Experiences crafts curated social and networking spaces for VIP leadership. We do not sell plain general tickets; we author complete multi-sensory experiences from customized catering to legendary player meetings.
                   </p>
 
                   <div className="space-y-4 pt-2">
@@ -1719,7 +1731,7 @@ export default function App() {
                     The VIP Entertainment Architect
                   </h1>
                   <p className="text-brand-dark/85 text-sm leading-relaxed font-light">
-                    Elevate Experiences specializes in tailored client networking packages and bespoke annual VIP event planning. Use our tactical design portal on the right to align event tiers with your aggregate headcount and per-guest targets.
+                    Elev8 Experiences specializes in tailored client networking packages and bespoke annual VIP event planning. Use our tactical design portal on the right to align event tiers with your aggregate headcount and per-guest targets.
                   </p>
                 </div>
 
@@ -1764,7 +1776,7 @@ export default function App() {
                     <div className="space-y-2">
                       <h3 className="text-2xl font-serif text-brand-green font-bold">Inquiry Proposal Dispatched</h3>
                       <p className="text-sm text-brand-dark/75 max-w-md mx-auto">
-                        Your custom VIP briefing has been successfully compiled. A senior Elevate accounts representative has been assigned to analyze matching debenture seats and draft a customized pitch.
+                        Your custom VIP briefing has been successfully compiled. A senior Elev8 accounts representative has been assigned to analyze matching debenture seats and draft a customized pitch.
                       </p>
                     </div>
                     <div className="bg-brand-sand-dark p-4 rounded border border-brand-green/10 text-xs text-brand-green max-w-sm mx-auto font-mono">
@@ -2218,7 +2230,7 @@ export default function App() {
                             {/* Gold Wordmark & Chip */}
                             <div className="flex justify-between items-start">
                               <div className="flex flex-col gap-0.5">
-                                <span className="text-[10px] tracking-[0.25em] text-brand-gold uppercase font-bold">E L E V A T E</span>
+                                <span className="text-[10px] tracking-[0.25em] text-brand-gold uppercase font-bold">E L E V 8</span>
                                 <span className="text-[6px] tracking-wider text-brand-gold-light/60 uppercase">SOVEREIGN PRIVÉ MEMBERSHIP</span>
                               </div>
                               <div className="w-8 h-6 rounded bg-gradient-to-r from-brand-gold via-brand-gold-light to-brand-gold opacity-90 relative overflow-hidden flex items-center justify-center text-[7px] text-[#0F1E17] font-bold font-mono">
@@ -2555,7 +2567,7 @@ export default function App() {
                                     {/* Pass Header */}
                                     <div className="bg-gradient-to-r from-brand-green to-brand-green-light px-4 py-2.5 flex justify-between items-center text-brand-sand">
                                       <div className="flex flex-col">
-                                        <span className="text-[7px] tracking-[0.2em] text-brand-gold font-bold uppercase">E L E V A T E</span>
+                                        <span className="text-[7px] tracking-[0.2em] text-brand-gold font-bold uppercase">E L E V 8</span>
                                         <span className="text-[5px] uppercase tracking-wider text-brand-sand-dark/60 font-medium">VIP Hospitality Ticket</span>
                                       </div>
                                       <span className="font-mono text-[9px] text-brand-gold-light tracking-wider font-semibold">{passId}</span>
@@ -3471,7 +3483,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
           
           <div className="space-y-3 col-span-1 md:col-span-2">
-            <h4 className="font-serif text-lg text-brand-gold font-bold tracking-widest">E L E V A T E</h4>
+            <h4 className="font-serif text-lg text-brand-gold font-bold tracking-widest">E L E V 8</h4>
             <p className="text-xs text-brand-sand-dark leading-relaxed font-light max-w-sm">
               The supreme progressive web application for VIP hospitality, elite sports debentures, and customized VIP social calendar bookings. Clone inspired by Official VIP, visual aesthetics inspired by Roland Garros French luxury.
             </p>
@@ -3514,7 +3526,7 @@ export default function App() {
         </div>
 
         <div className="max-w-7xl mx-auto pt-8 mt-8 border-t border-brand-gold/15 flex flex-col sm:flex-row justify-between items-center gap-4 text-[11px] text-brand-sand-dark font-light">
-          <p>© 2026 Elevate Experiences. Authorized ticketing & hospitality arrangements only. All rights reserved.</p>
+          <p>© 2026 Elev8 Experiences. Authorized ticketing & hospitality arrangements only. All rights reserved.</p>
           <div className="flex gap-4">
             <a href="#privacy" className="hover:underline">Privacy Charter</a>
             <a href="#terms" className="hover:underline">Booking Terms</a>
@@ -3546,7 +3558,7 @@ export default function App() {
             </div>
             
             <p className="mt-3 text-xs text-brand-dark/85 leading-relaxed font-light">
-              To install <strong>Elevate Experiences</strong> directly onto your iPhone or iPad home screen:
+              To install <strong>Elev8 Experiences</strong> directly onto your iPhone or iPad home screen:
             </p>
 
             <div className="my-4 p-3 bg-brand-sand-dark rounded border border-brand-green/10 text-xs space-y-2 font-medium text-brand-green">
@@ -3579,7 +3591,7 @@ export default function App() {
             <div className="bg-brand-green p-6 text-brand-sand border-b border-brand-gold/30 flex justify-between items-start">
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[9px] tracking-[0.25em] text-brand-gold uppercase font-semibold">E L E V A T E</span>
+                  <span className="text-[9px] tracking-[0.25em] text-brand-gold uppercase font-semibold">E L E V 8</span>
                   <span className="text-[7px] text-brand-gold-light/60 uppercase">MEMBER PORTAL</span>
                 </div>
                 <h3 className="font-serif text-xl font-bold text-white">

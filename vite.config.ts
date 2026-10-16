@@ -14,8 +14,8 @@ export default defineConfig(() => {
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'icon.svg'],
         manifest: {
           id: '/',
-          name: 'Elevate Experiences',
-          short_name: 'Elevate',
+          name: 'Elev8 Experiences',
+          short_name: 'Elev8',
           description: 'Premium VIP hospitality & corporate entertainment bookings.',
           theme_color: '#0A3F2C',
           background_color: '#F4EFE6',
